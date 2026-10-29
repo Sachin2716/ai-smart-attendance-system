@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Communicate with Python FastAPI AI Service
-    const aiServiceUrl = process.env.FASTAPI_AI_URL || 'http://127.0.0.1:8000';
+    const aiServiceUrl = process.env.FASTAPI_AI_URL || process.env.BACKEND_URL || 'http://127.0.0.1:8000';
     let aiResponse = null;
 
     try {

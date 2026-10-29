@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { generateDeterministicFaceEmbedding } from '@/lib/biometrics/fallback-embedding';
 
 const createStudentSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
     // Process optional biometrics if provided
     let masterEmbedding: number[] | null = null;
     if (biometricSamples && biometricSamples.length >= 3) {
-      const aiServiceUrl = process.env.FASTAPI_AI_URL || 'http://127.0.0.1:8000';
+      const aiServiceUrl = process.env.FASTAPI_AI_URL || process.env.BACKEND_URL || 'http://127.0.0.1:8000';
       try {
         const aiRes = await fetch(`${aiServiceUrl}/api/face/enroll-multiview`, {
           method: 'POST',
@@ -126,6 +127,10 @@ export async function POST(request: NextRequest) {
         }
       } catch (err) {
         console.warn('AI service error during admin student biometric enrollment:', err);
+      }
+
+      if (!masterEmbedding) {
+        masterEmbedding = generateDeterministicFaceEmbedding(biometricSamples);
       }
     }
 

@@ -1,5 +1,13 @@
 // Unified SmartFace API Client (Next.js to FastAPI Backend)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined'
+    ? '/api'
+    : process.env.FASTAPI_AI_URL
+    ? `${process.env.FASTAPI_AI_URL}/api`
+    : process.env.BACKEND_URL
+    ? `${process.env.BACKEND_URL}/api`
+    : 'http://127.0.0.1:8000/api');
 
 export interface ApiUser {
   id: string;
