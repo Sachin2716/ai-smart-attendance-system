@@ -21,6 +21,7 @@ import {
   Fingerprint,
   Camera,
   Layers,
+  Trash2,
 } from 'lucide-react';
 import { MultiAngleFaceEnrollment } from '@/components/biometrics/MultiAngleFaceEnrollment';
 
@@ -63,6 +64,8 @@ export default function AdminStudentsPage() {
   // Modals
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -214,6 +217,28 @@ export default function AdminStudentsPage() {
       }
     } catch (e) {
       toast.error('Network error updating status');
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!studentToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/students/${studentToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || 'Student deleted successfully');
+        setStudents((prev) => prev.filter((s) => s.id !== studentToDelete.id));
+        setStudentToDelete(null);
+      } else {
+        toast.error(data.error || 'Failed to delete student');
+      }
+    } catch (err) {
+      toast.error('Network error deleting student record');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -376,6 +401,13 @@ export default function AdminStudentsPage() {
                         <UserCheck className="w-3.5 h-3.5" />
                       )}
                     </button>
+                    <button
+                      onClick={() => setStudentToDelete(stu)}
+                      className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-[#EF4444] border border-rose-500/30 hover:border-rose-400 transition-all cursor-pointer"
+                      title="Delete Student"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -519,6 +551,62 @@ export default function AdminStudentsPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {studentToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md p-6 rounded-2xl bg-[#18181B] border border-rose-500/40 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-[#EF4444]">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Delete Student Account</h3>
+                  <p className="text-xs text-[#9CA3AF]">This action is permanent and cannot be undone.</p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#111318] border border-[#27272A] space-y-1 text-xs">
+                <p className="text-white font-semibold">
+                  {studentToDelete.name} ({studentToDelete.rollNumber})
+                </p>
+                <p className="text-[#9CA3AF] font-mono">{studentToDelete.email}</p>
+                <p className="text-[11px] text-rose-400 pt-1">
+                  Deleting this student will permanently erase their facial biometric templates, class enrollments, and attendance records.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStudentToDelete(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-xl bg-[#111318] hover:bg-[#27272A] text-xs font-semibold text-[#9CA3AF] hover:text-white border border-[#27272A] transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteStudent}
+                  disabled={isDeleting}
+                  className="px-5 py-2 rounded-xl bg-[#EF4444] hover:bg-rose-600 text-white text-xs font-bold shadow-lg shadow-rose-500/30 flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  <span>{isDeleting ? 'Deleting...' : 'Delete Permanently'}</span>
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

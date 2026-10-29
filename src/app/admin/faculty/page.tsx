@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   CalendarDays,
   Layers,
+  Trash2,
 } from 'lucide-react';
 
 interface FacultyMember {
@@ -68,6 +69,8 @@ export default function AdminFacultyPage() {
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [facultyToEdit, setFacultyToEdit] = useState<FacultyMember | null>(null);
+  const [facultyToDelete, setFacultyToDelete] = useState<FacultyMember | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -209,6 +212,28 @@ export default function AdminFacultyPage() {
       }
     } catch (e) {
       toast.error('Network error updating status');
+    }
+  };
+
+  const handleDeleteFaculty = async () => {
+    if (!facultyToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/faculty/${facultyToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || 'Faculty deleted successfully');
+        setFaculty((prev) => prev.filter((f) => f.id !== facultyToDelete.id));
+        setFacultyToDelete(null);
+      } else {
+        toast.error(data.error || 'Failed to delete faculty');
+      }
+    } catch (err) {
+      toast.error('Network error deleting faculty record');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -368,6 +393,13 @@ export default function AdminFacultyPage() {
                     <UserCheck className="w-3.5 h-3.5" />
                   )}
                 </button>
+                <button
+                  onClick={() => setFacultyToDelete(fac)}
+                  className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-[#EF4444] border border-rose-500/30 hover:border-rose-400 transition-colors cursor-pointer"
+                  title="Delete Faculty"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </div>
@@ -499,6 +531,63 @@ export default function AdminFacultyPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Delete Faculty Confirmation Modal */}
+        {facultyToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md p-6 rounded-2xl bg-[#18181B] border border-rose-500/40 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-[#EF4444]">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Delete Faculty Account</h3>
+                  <p className="text-xs text-[#9CA3AF]">This action is permanent and cannot be undone.</p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#111318] border border-[#27272A] space-y-1 text-xs">
+                <p className="text-white font-semibold">
+                  {facultyToDelete.name} ({facultyToDelete.employeeId})
+                </p>
+                <p className="text-[#9CA3AF] font-mono">{facultyToDelete.email}</p>
+                <p className="text-[#9CA3AF]">{facultyToDelete.designation} • {facultyToDelete.department?.name}</p>
+                <p className="text-[11px] text-rose-400 pt-1">
+                  Deleting this faculty member will unassign their teaching timetable slots and remove their access credentials.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setFacultyToDelete(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-xl bg-[#111318] hover:bg-[#27272A] text-xs font-semibold text-[#9CA3AF] hover:text-white border border-[#27272A] transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteFaculty}
+                  disabled={isDeleting}
+                  className="px-5 py-2 rounded-xl bg-[#EF4444] hover:bg-rose-600 text-white text-xs font-bold shadow-lg shadow-rose-500/30 flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  <span>{isDeleting ? 'Deleting...' : 'Delete Permanently'}</span>
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

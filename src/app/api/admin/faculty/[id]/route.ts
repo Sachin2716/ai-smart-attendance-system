@@ -124,3 +124,95 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to update faculty record' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireAuth(['ADMIN']);
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const { id } = await params;
+
+  try {
+    const faculty = await prisma.faculty.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!faculty) {
+      return NextResponse.json({ error: 'Faculty record not found' }, { status: 404 });
+    }
+
+    // Prevent deleting own administrative account if linked
+    if (faculty.userId === auth.session!.userId) {
+      return NextResponse.json(
+        { error: 'Cannot delete your own administrative account' },
+        { status: 400 }
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete timetable slots assigned to this faculty
+      await tx.timetableSlot.deleteMany({ where: { facultyId: id } });
+
+      // 2. Delete teaching assignments
+      await tx.teachingAssignment.deleteMany({ where: { facultyId: id } });
+
+      // 3. Delete attendance sessions and dependent attendance records
+      const sessions = await tx.attendanceSession.findMany({
+        where: { facultyId: id },
+        select: { id: true },
+      });
+      const sessionIds = sessions.map((s) => s.id);
+      if (sessionIds.length > 0) {
+        await tx.correctionRequest.deleteMany({
+          where: { sessionId: { in: sessionIds } },
+        });
+        await tx.attendanceRecord.deleteMany({
+          where: { sessionId: { in: sessionIds } },
+        });
+        await tx.attendanceSession.deleteMany({
+          where: { id: { in: sessionIds } },
+        });
+      }
+
+      // 4. Delete faculty profile and linked user account
+      await tx.faculty.delete({ where: { id } });
+      if (faculty.userId) {
+        await tx.user.delete({ where: { id: faculty.userId } });
+      }
+
+      // 5. Record administrative audit trail
+      await tx.auditLog.create({
+        data: {
+          actorId: auth.session!.userId,
+          actorRole: auth.session!.role,
+          action: 'DELETE_FACULTY',
+          entityType: 'FACULTY',
+          entityId: id,
+          previousValue: JSON.stringify({
+            name: faculty.name,
+            employeeId: faculty.employeeId,
+            email: faculty.email,
+          }),
+          reason: 'Permanent faculty account deletion by Administrator',
+        },
+      });
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Faculty '${faculty.name}' (${faculty.employeeId}) deleted successfully`,
+    });
+  } catch (error: any) {
+    console.error('Delete faculty error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete faculty record' },
+      { status: 500 }
+    );
+  }
+}
+

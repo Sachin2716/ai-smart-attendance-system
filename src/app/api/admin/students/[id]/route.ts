@@ -122,3 +122,69 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to update student record' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireAuth(['ADMIN']);
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const { id } = await params;
+
+  try {
+    const student = await prisma.student.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!student) {
+      return NextResponse.json({ error: 'Student record not found' }, { status: 404 });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Clean up child dependencies safely
+      await tx.faceTemplate.deleteMany({ where: { studentId: id } });
+      await tx.correctionRequest.deleteMany({ where: { studentId: id } });
+      await tx.attendanceRecord.deleteMany({ where: { studentId: id } });
+      await tx.enrollment.deleteMany({ where: { studentId: id } });
+      
+      // Delete student profile and user account
+      await tx.student.delete({ where: { id } });
+      if (student.userId) {
+        await tx.user.delete({ where: { id: student.userId } });
+      }
+
+      // Record administrative audit trail
+      await tx.auditLog.create({
+        data: {
+          actorId: auth.session!.userId,
+          actorRole: auth.session!.role,
+          action: 'DELETE_STUDENT',
+          entityType: 'STUDENT',
+          entityId: id,
+          previousValue: JSON.stringify({
+            name: student.name,
+            rollNumber: student.rollNumber,
+            email: student.email,
+          }),
+          reason: 'Permanent student account deletion by Administrator',
+        },
+      });
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Student '${student.name}' (${student.rollNumber}) deleted successfully`,
+    });
+  } catch (error: any) {
+    console.error('Delete student error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete student record' },
+      { status: 500 }
+    );
+  }
+}
+
