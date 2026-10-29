@@ -11,12 +11,8 @@ import {
   ArrowRight,
   ArrowUp,
   User,
-  Zap,
   Sparkles,
   Check,
-  Terminal,
-  ShieldCheck,
-  Info,
 } from 'lucide-react';
 import {
   DEFAULT_POSE_CONFIG,
@@ -55,7 +51,7 @@ function playChime(freq = 880, duration = 0.08) {
     osc.start();
     osc.stop(ctx.currentTime + duration);
   } catch {
-    // Ignore if audio permissions blocked by browser policy
+    // Ignore audio permission blocking
   }
 }
 
@@ -87,15 +83,10 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
   const [shutterFlash, setShutterFlash] = useState(false);
   const [showCheckmarkOverlay, setShowCheckmarkOverlay] = useState(false);
 
-  // Development / Debug Telemetry Toggle
-  const [showDevTelemetry, setShowDevTelemetry] = useState(false);
-  const [liveYaw, setLiveYaw] = useState(0);
-  const [livePitch, setLivePitch] = useState(0);
-
-  // Stability Hold Tracker (Strict 700 milliseconds)
+  // Fast Snappy Stability Hold Tracker (200ms)
   const holdStartTimeRef = useRef<number | null>(null);
   const isAutoSnappingRef = useRef(false);
-  const stepTransitionCooldownRef = useRef(Date.now() + 400);
+  const stepTransitionCooldownRef = useRef(Date.now() + 250);
 
   const currentStep: PoseStepMetadata = POSE_STEPS[currentStepIndex];
   const allCaptured = POSE_STEPS.every((step) => !!capturedFrames[step.id]);
@@ -162,16 +153,16 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
     // Audio and Visual Shutter Feedback
     setShutterFlash(true);
     setShowCheckmarkOverlay(true);
-    setTimeout(() => setShutterFlash(false), 200);
-    setTimeout(() => setShowCheckmarkOverlay(false), 650);
+    setTimeout(() => setShutterFlash(false), 180);
+    setTimeout(() => setShowCheckmarkOverlay(false), 500);
     playSuccessDoubleChime();
 
     const captureData: DirectionalFrameCapture = {
       stepId: currentStep.id,
       direction: currentStep.backendDirection,
       image_base64: dataUrl,
-      capturedYaw: liveYaw,
-      capturedPitch: livePitch,
+      capturedYaw: 0,
+      capturedPitch: 0,
       capturedTimestamp: Date.now(),
     };
 
@@ -180,7 +171,7 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
       [currentStep.id]: captureData,
     }));
 
-    // Reset hold timer and set grace period before evaluating next pose
+    // Reset hold timer and brief grace period before evaluating next pose
     holdStartTimeRef.current = null;
     setStabilityProgress(0);
     setIsPoseValid(false);
@@ -190,11 +181,11 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
     if (currentStepIndex < POSE_STEPS.length - 1) {
       setTimeout(() => {
         setCurrentStepIndex((prev) => Math.min(prev + 1, POSE_STEPS.length - 1));
-      }, 500);
+      }, 350);
     }
-  }, [currentStep, liveYaw, livePitch, currentStepIndex]);
+  }, [currentStep, currentStepIndex]);
 
-  // Real-Time Frame Processing & 700ms Stability Evaluation Loop
+  // Real-Time Frame Processing & Instant Auto-Capture on Tilt
   useEffect(() => {
     if (!cameraActive || allCaptured) return;
 
@@ -223,11 +214,6 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
         DEFAULT_POSE_CONFIG
       );
 
-      if (estimation) {
-        setLiveYaw(estimation.angles.yaw);
-        setLivePitch(estimation.angles.pitch);
-      }
-
       // Check transition grace period
       if (Date.now() < stepTransitionCooldownRef.current) {
         setIsPoseValid(false);
@@ -236,12 +222,12 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
         return;
       }
 
-      // Validate against current step's mathematical requirements
+      // Validate against current step's directional tilt
       const validation = validatePoseForStep(estimation, currentStep.id, DEFAULT_POSE_CONFIG);
       setLastValidation(validation);
 
       if (validation.isValid) {
-        // Face is strictly inside acceptable range!
+        // Correct tilt detected!
         setIsPoseValid(true);
 
         if (holdStartTimeRef.current === null) {
@@ -252,16 +238,16 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
         const progressPct = Math.min(100, Math.round((elapsed / DEFAULT_POSE_CONFIG.STABILITY_HOLD_MS) * 100));
         setStabilityProgress(progressPct);
 
-        // Strict 700ms stability reached -> Auto-capture photo
+        // Auto-capture photo as soon as 200ms hold is satisfied
         if (elapsed >= DEFAULT_POSE_CONFIG.STABILITY_HOLD_MS && !isAutoSnappingRef.current) {
           isAutoSnappingRef.current = true;
           executeCapture();
           setTimeout(() => {
             isAutoSnappingRef.current = false;
-          }, 800);
+          }, 400);
         }
       } else {
-        // Face left acceptable range or quality dropped -> Reset stability timer immediately
+        // Wrong direction or no face -> reset timer
         setIsPoseValid(false);
         holdStartTimeRef.current = null;
         setStabilityProgress(0);
@@ -280,7 +266,7 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
     holdStartTimeRef.current = null;
     setStabilityProgress(0);
     setIsPoseValid(false);
-    stepTransitionCooldownRef.current = Date.now() + 600;
+    stepTransitionCooldownRef.current = Date.now() + 300;
   };
 
   const handleFinalSubmit = () => {
@@ -310,7 +296,7 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className="bg-[#18181B] border border-[#27272A] rounded-2xl p-5 sm:p-6 text-white max-w-2xl mx-auto shadow-2xl relative overflow-hidden select-none"
     >
       {/* Top Laser Accent Line */}
@@ -321,29 +307,15 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
         <div>
           <h3 className="text-base sm:text-lg font-bold text-[#F9FAFB] flex items-center gap-2">
             <Camera className="w-5 h-5 text-[#22D3EE]" />
-            Strict Biometric Pose Auto-Capture
+            Biometric Face Auto-Capture
           </h3>
           <p className="text-xs text-[#9CA3AF] mt-0.5">
             Step {currentStepIndex + 1} of {POSE_STEPS.length}: {currentStep.title}
           </p>
         </div>
 
-        {/* Counter and Debug Toggle */}
+        {/* Counter */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowDevTelemetry(!showDevTelemetry)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-mono transition cursor-pointer ${
-              showDevTelemetry
-                ? 'bg-blue-950/80 text-cyan-300 border-cyan-500/50 shadow-sm'
-                : 'bg-[#111318] text-[#9CA3AF] border-[#27272A] hover:text-white'
-            }`}
-            title="Toggle developer real-time angular telemetry"
-          >
-            <Terminal className="w-3 h-3" />
-            <span>Dev Angle HUD</span>
-          </button>
-
           <div className="flex items-center gap-1.5 bg-[#111318] px-3 py-1 rounded-full border border-[#27272A]">
             <span className="text-xs font-mono font-bold text-[#22D3EE]">
               {completedCount}/{POSE_STEPS.length}
@@ -367,7 +339,7 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
                 holdStartTimeRef.current = null;
                 setStabilityProgress(0);
                 setIsPoseValid(false);
-                stepTransitionCooldownRef.current = Date.now() + 500;
+                stepTransitionCooldownRef.current = Date.now() + 300;
               }}
               className={`flex flex-col items-center py-2 px-1 rounded-xl border text-center transition-all cursor-pointer ${
                 isCurrent
@@ -398,7 +370,7 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
         className={`relative aspect-[4/3] bg-black rounded-2xl overflow-hidden border-2 transition-all duration-300 shadow-inner flex items-center justify-center ${
           isPoseValid
             ? 'border-emerald-500 shadow-[0_0_35px_rgba(34,197,94,0.35)]'
-            : 'border-rose-500/70 shadow-[0_0_25px_rgba(239,68,68,0.2)]'
+            : 'border-[#27272A]'
         }`}
       >
         {cameraError ? (
@@ -424,43 +396,20 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
 
             {/* Success Checkmark Animation Overlay on Capture */}
             {showCheckmarkOverlay && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 bg-black/40 backdrop-blur-[2px] animate-in fade-in zoom-in duration-200">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 bg-black/40 backdrop-blur-[2px] animate-in fade-in zoom-in duration-150">
                 <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center shadow-[0_0_50px_rgba(34,197,94,0.8)]">
                   <Check className="w-10 h-10 text-emerald-400 animate-bounce" />
                 </div>
               </div>
             )}
 
-            {/* Developer-Only Real-Time Angle HUD (Yaw / Pitch) */}
-            {showDevTelemetry && (
-              <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-20">
-                <div className="bg-black/80 backdrop-blur-md border border-[#27272A] rounded-xl px-3 py-1.5 flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-[#9CA3AF] uppercase">Live Angle:</span>
-                  <span
-                    className={`text-xs font-mono font-bold ${
-                      isPoseValid ? 'text-emerald-400' : 'text-rose-400'
-                    }`}
-                  >
-                    Yaw: {liveYaw > 0 ? `+${liveYaw}` : liveYaw}° | Pitch: {livePitch > 0 ? `+${livePitch}` : livePitch}°
-                  </span>
-                </div>
-
-                <div className="bg-black/80 backdrop-blur-md border border-[#27272A] rounded-xl px-3 py-1.5 flex items-center gap-1.5">
-                  <span className="text-[10px] font-mono text-[#9CA3AF] uppercase">Target Range:</span>
-                  <span className="text-xs font-mono font-bold text-cyan-400">
-                    {currentStep.angleConditionDescription}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Face-Position Guide Oval with Dynamic Red/Green Aura */}
+            {/* Face-Position Guide Oval with Green Light on Tilt */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
               <div
                 className={`relative w-48 h-64 border-3 rounded-[50%] transition-all duration-200 flex flex-col items-center justify-between p-4 ${
                   isPoseValid
                     ? 'border-emerald-400 scale-105 shadow-[0_0_45px_rgba(52,211,153,0.95)] ring-4 ring-emerald-500/30'
-                    : 'border-rose-500/80 border-dashed shadow-[0_0_30px_rgba(239,68,68,0.35)]'
+                    : 'border-cyan-500/60 border-dashed shadow-[0_0_20px_rgba(34,211,238,0.2)]'
                 }`}
               >
                 {/* State Tag Badge */}
@@ -468,15 +417,15 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
                   className={`text-[10px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-full backdrop-blur transition-colors ${
                     isPoseValid
                       ? 'bg-emerald-500 text-black font-extrabold shadow-md'
-                      : 'bg-rose-950/80 text-rose-300 border border-rose-500/40'
+                      : 'bg-[#111318]/90 text-cyan-300 border border-cyan-500/40'
                   }`}
                 >
-                  {isPoseValid ? 'POSE ACCEPTED' : `${currentStep.id} REQUIRED`}
+                  {isPoseValid ? 'CAPTURING...' : currentStep.title}
                 </div>
 
-                {/* Circular Hold Progress Ring when in Green State */}
+                {/* Snappy Hold Ring when Green Light Appears */}
                 {isPoseValid && (
-                  <div className="flex flex-col items-center gap-1.5 animate-in fade-in zoom-in duration-150">
+                  <div className="flex flex-col items-center gap-1.5 animate-in fade-in zoom-in duration-100">
                     <div className="relative w-14 h-14 flex items-center justify-center">
                       <svg className="w-14 h-14 transform -rotate-90">
                         <circle
@@ -502,9 +451,6 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
                       </svg>
                       <Sparkles className="w-5 h-5 text-emerald-400 absolute animate-pulse" />
                     </div>
-                    <span className="text-[10px] font-mono font-bold text-emerald-300 tracking-wider bg-black/90 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                      HOLD 700MS: {stabilityProgress}%
-                    </span>
                   </div>
                 )}
 
@@ -528,7 +474,7 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
                   className={`w-2.5 h-2.5 rounded-full ${
                     isPoseValid
                       ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)] animate-ping'
-                      : 'bg-rose-500'
+                      : 'bg-cyan-400'
                   }`}
                 />
                 <AnimatePresence mode="wait">
@@ -544,7 +490,7 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
                 </AnimatePresence>
               </div>
               <p
-                className={`text-[11px] mt-0.5 font-mono transition-colors ${
+                className={`text-[11px] mt-0.5 font-medium transition-colors ${
                   isPoseValid ? 'text-emerald-400 font-semibold' : 'text-[#9CA3AF]'
                 }`}
               >
@@ -575,7 +521,7 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
                   holdStartTimeRef.current = null;
                   setStabilityProgress(0);
                   setIsPoseValid(false);
-                  stepTransitionCooldownRef.current = Date.now() + 500;
+                  stepTransitionCooldownRef.current = Date.now() + 300;
                 }}
                 className={`relative h-20 rounded-xl overflow-hidden border cursor-pointer group transition-all ${
                   isCurrent
@@ -626,7 +572,7 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
             ) : (
               <p className="text-xs text-[#9CA3AF] flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                Hold steady for 700ms to auto-capture
+                Tilt head to auto-capture
               </p>
             )}
           </div>
