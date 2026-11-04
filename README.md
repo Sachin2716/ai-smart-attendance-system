@@ -1,6 +1,32 @@
 # 🎓 AI Smart Attendance Management System
 **AI-Powered Smart Attendance Management System Featuring Real-Time Face Detection, Multi-Pose Facial Registration, Automatic Image Capture, Secure Authentication, and Institutional Governance**
 
+[![Live Deployment](https://img.shields.io/badge/Live%20Demo-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://smart-college-attendance.vercel.app)
+[![Next.js](https://img.shields.io/badge/Next.js%2016-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React%2019-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io)
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white)](https://opencv.org)
+
+---
+
+## 🚀 Live Production Deployment
+
+* **Live Web Application**: **[https://smart-college-attendance.vercel.app](https://smart-college-attendance.vercel.app)**
+* **Alternate Domain**: **[https://smart-college-attendance-sachin2716.vercel.app](https://smart-college-attendance-sachin2716.vercel.app)**
+* **Status**: 🟢 **Operational & Public**
+
+### 🔑 Verified Live Credentials
+
+| Role | Email Address | Password | Direct URL |
+| :--- | :--- | :--- | :--- |
+| **Administrator** | `admin@caias.edu.in` | `admin123` *(or `Admin@123`)* | [/admin/dashboard](https://smart-college-attendance.vercel.app/admin/dashboard) |
+| **Faculty Member** | `faculty@caias.edu.in` | `faculty123` *(or `Faculty@123`)* | [/faculty/dashboard](https://smart-college-attendance.vercel.app/faculty/dashboard) |
+| **Enrolled Student** | `sachin.aiml@caias.edu.in` | `Student@123` | [/student/dashboard](https://smart-college-attendance.vercel.app/student/dashboard) |
+
+*(New students can also self-register with multi-angle face verification directly at [/register](https://smart-college-attendance.vercel.app/register)).*
+
 ---
 
 ## 🌟 Executive Overview
