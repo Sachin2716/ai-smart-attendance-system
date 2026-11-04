@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: ai-smart-attendance-backend
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: PROJECT_NAME
+        value: "SmartFace Attendance Management System"
+      - key: VERSION
+        value: "1.0.0"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: '["*"]'
+      - key: SIMILARITY_THRESHOLD
+        value: "0.78"
+      - key: LIVENESS_THRESHOLD
+        value: "0.65"
+      - key: BLUR_MIN_VARIANCE
+        value: "50.0"
+      - key: BRIGHTNESS_MIN
+        value: "30.0"
+      - key: BRIGHTNESS_MAX
+        value: "230.0"
