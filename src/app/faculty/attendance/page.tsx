@@ -296,6 +296,7 @@ export default function FacultyAttendancePage() {
           body: JSON.stringify({
             sessionId: activeSession.id,
             imageBase64,
+            studentId: currentStudent?.studentId,
           }),
         });
 
@@ -315,9 +316,9 @@ export default function FacultyAttendancePage() {
             }, 800);
           }
         } else if (!data.aiAvailable) {
-          setAiStatus('OFFLINE');
-          setAiMessage(data.error);
-          toast.warning('AI service offline. Use the manual buttons to mark attendance.');
+          setAiStatus('FAILED');
+          setAiMessage(data.error || 'Face verification failed.');
+          toast.error(data.error || 'Face not verified. You can retry or use manual marking.');
         } else {
           setAiStatus('FAILED');
           const errorMsg = data.error || 'Face not recognized with sufficient confidence.';

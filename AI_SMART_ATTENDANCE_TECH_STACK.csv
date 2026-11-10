@@ -1,0 +1,147 @@
+Category,No,Technology / Tool / Library,Version,Purpose,Status
+Programming Languages,1,TypeScript,5.9.3,Type-safe application development across full Next.js stack and APIs,Active / Production
+Programming Languages,2,Python,3.13.5 (Dev) / 3.11.9 (Prod),Deep learning OpenCV computer vision microservice,Active / Production
+Programming Languages,3,JavaScript (Node.js),24.18.0,Server runtime and client-side interactions,Active / Production
+Programming Languages,4,SQL,PostgreSQL 16+ / SQLite 3,Relational database modeling and queries,Active / Production
+Programming Languages,5,HTML5,HTML5 Standard,Web video canvas rendering and semantic UI markup,Active / Production
+Programming Languages,6,CSS3,CSS3 / PostCSS,Cyberpunk dark aesthetic and responsive styling,Active / Production
+Frontend Technologies,1,Next.js,16.3.0,App Router framework with server/client components,Active / Production
+Frontend Technologies,2,React,19.2.8,Core reactive UI component library,Active / Production
+Frontend Technologies,3,React DOM,19.2.8,DOM renderer for React web application,Active / Production
+Frontend Technologies,4,Tailwind CSS,4.3.3,Utility-first CSS styling engine,Active / Production
+Frontend Technologies,5,@tailwindcss/postcss,4.3.3,PostCSS integration for Tailwind CSS v4,Active / Production
+Frontend Technologies,6,React Hook Form,7.91.0,Form state and input validation management,Active / Production
+Frontend Technologies,7,@hookform/resolvers,6.0.1,Validation resolvers bridging React Hook Form with Zod,Active / Production
+Frontend Technologies,8,Zod,4.6.7,TypeScript schema definition and validation,Active / Production
+Frontend Technologies,9,clsx,2.1.1,Conditional className string construction,Active / Production
+Frontend Technologies,10,tailwind-merge,3.6.0,Tailwind CSS class conflict resolution,Active / Production
+Backend Technologies,1,Next.js Route Handlers,16.3.0,Primary backend REST APIs for auth and college operations,Active / Production
+Backend Technologies,2,FastAPI,0.143.0,Asynchronous Python web API for computer vision,Active / Production
+Backend Technologies,3,Starlette,1.8.0,ASGI framework foundation for FastAPI,Active / Production
+Backend Technologies,4,Uvicorn,0.54.0,ASGI web server executing Python FastAPI,Active / Production
+Backend Technologies,5,Pydantic,2.14.1,Data validation using Python type annotations,Active / Production
+Backend Technologies,6,Pydantic Settings,2.15.0,Environment variable parsing for FastAPI,Active / Production
+Backend Technologies,7,python-multipart,0.0.32,Multipart form-data and image upload parser,Active / Production
+Backend Technologies,8,CORSMiddleware,Built-in,Cross-Origin Resource Sharing control,Active / Production
+AI & Machine Learning,1,YuNet ONNX Model,face_detection_yunet.onnx,Pretrained DNN for edge face detection,Active / Production
+AI & Machine Learning,2,SFace ONNX Model,face_recognition_sface.onnx,Pretrained ResNet model outputting 128D feature vectors,Active / Production
+AI & Machine Learning,3,Cosine Similarity Algorithm,Mathematical Formula,Vector angle comparison for identity matching,Active / Production
+AI & Machine Learning,4,L2 Normalization,OpenCV / NumPy,Projects vectors onto unit sphere for scale invariance,Active / Production
+AI & Machine Learning,5,Multi-Angle Master Synthesizer,Custom Algorithm,Synthesizes 4 distinct face poses into master template,Active / Production
+AI & Machine Learning,6,Serverless Biometric Fallback,Custom TypeScript,High-entropy feature extractor for serverless runtimes,Active / Production
+Computer Vision,1,OpenCV (cv2),4.14.0.94,Computer vision engine for face and image processing,Active / Production
+Computer Vision,2,cv2.FaceDetectorYN,4.14.0.94,YuNet deep learning face detector API,Active / Production
+Computer Vision,3,cv2.FaceRecognizerSF,4.14.0.94,SFace deep learning face recognition API,Active / Production
+Computer Vision,4,Haar Cascade Frontal Face,haarcascade_frontalface_default.xml,Frontal face bounding-box detection,Active / Production
+Computer Vision,5,Haar Cascade Profile Face,haarcascade_profileface.xml,Profile face detection for lateral poses,Active / Production
+Computer Vision,6,Haar Cascade Eye Detector,haarcascade_eye.xml,Ocular landmark localization and alignment,Active / Production
+Computer Vision,7,Laplacian Blur Variance,cv2.Laplacian,Sharpness evaluation preventing printed photo attacks,Active / Production
+Computer Vision,8,Passive Liveness Analyzer,Custom Algorithm,Luminance and dynamic range check blocking spoofing,Active / Production
+Computer Vision,9,Client-Side Head-Pose Estimator,Custom Canvas Algorithm,Calculates real-time Yaw and Pitch angles,Active / Production
+Python Libraries,1,fastapi,0.143.0,Python web API framework,Installed & Used
+Python Libraries,2,uvicorn,0.54.0,ASGI server running FastAPI,Installed & Used
+Python Libraries,3,numpy,2.5.4,Numerical array processing for images and vectors,Installed & Used
+Python Libraries,4,opencv-python-headless,4.14.0.94,Headless OpenCV with deep neural network module,Installed & Used
+Python Libraries,5,pydantic,2.14.1,Schema validation and serialization,Installed & Used
+Python Libraries,6,pydantic-settings,2.15.0,Settings and environment variable management,Installed & Used
+Python Libraries,7,sqlalchemy,2.1.4,SQL toolkit and Object Relational Mapper,Installed & Used
+Python Libraries,8,aiosqlite,0.22.1,Asynchronous SQLite database driver,Installed & Used
+Python Libraries,9,psycopg2-binary,2.9.10,PostgreSQL database driver,Installed & Used
+Python Libraries,10,pandas,3.0.6,Data analysis for tabular attendance data,Installed & Used
+Python Libraries,11,openpyxl,3.1.5,Excel workbook processing engine,Installed & Used
+Python Libraries,12,python-jose,3.5.0,Cryptographic JWT encoding and decoding,Installed & Used
+Python Libraries,13,cryptography,50.0.2,Cryptographic primitives and token encryption,Installed & Used
+Python Libraries,14,passlib,1.7.4,Password hashing framework,Installed & Used
+Python Libraries,15,bcrypt,5.0.0,Bcrypt password hashing library,Installed & Used
+Python Libraries,16,python-multipart,0.0.32,Form-data payload parsing,Installed & Used
+Python Libraries,17,email-validator,2.3.0,Institutional email validation,Installed & Used
+Python Libraries,18,httpx,0.28.1,Asynchronous HTTP client,Installed & Used
+Python Libraries,19,pytest,9.1.1,Python test framework,Installed (Testing)
+Python Libraries,20,python-dotenv,1.2.4,Environment variable loader,Installed & Used
+JavaScript/Node Libraries,1,next,16.3.0,Next.js App Router framework,Installed & Used
+JavaScript/Node Libraries,2,react,19.2.8,React core library,Installed & Used
+JavaScript/Node Libraries,3,react-dom,19.2.8,React DOM rendering engine,Installed & Used
+JavaScript/Node Libraries,4,@prisma/client,6.19.3,Generated Prisma database client,Installed & Used
+JavaScript/Node Libraries,5,prisma,6.19.3,Prisma CLI and migration engine,Installed & Used
+JavaScript/Node Libraries,6,jose,6.2.13,Edge-compatible JWT signing and verification,Installed & Used
+JavaScript/Node Libraries,7,bcryptjs,3.0.3,Pure JavaScript bcrypt implementation,Installed & Used
+JavaScript/Node Libraries,8,zod,4.6.7,TypeScript schema validation library,Installed & Used
+JavaScript/Node Libraries,9,react-hook-form,7.91.0,Form state and validation management,Installed & Used
+JavaScript/Node Libraries,10,@hookform/resolvers,6.0.1,Bridge between React Hook Form and Zod,Installed & Used
+JavaScript/Node Libraries,11,lucide-react,1.29.0,Icon library for modern UI components,Installed & Used
+JavaScript/Node Libraries,12,framer-motion,13.0.0,Motion animations and layout transitions,Installed & Used
+JavaScript/Node Libraries,13,recharts,3.10.1,SVG charting library for attendance metrics,Installed & Used
+JavaScript/Node Libraries,14,sonner,2.0.8,Toast notifications with status indicators,Installed & Used
+JavaScript/Node Libraries,15,canvas-confetti,1.9.4,Celebration particle effects for attendance,Installed & Used
+JavaScript/Node Libraries,16,jspdf,4.2.1,PDF generation library,Installed & Used
+JavaScript/Node Libraries,17,jspdf-autotable,5.0.8,jsPDF table formatting plugin,Installed & Used
+JavaScript/Node Libraries,18,xlsx,0.18.5,Excel workbook reader and writer,Installed & Used
+JavaScript/Node Libraries,19,clsx,2.1.1,Conditional CSS class construct utility,Installed & Used
+JavaScript/Node Libraries,20,tailwind-merge,3.6.0,Tailwind CSS conflict resolver,Installed & Used
+JavaScript/Node Libraries,21,tailwindcss,4.3.3,Tailwind CSS v4 framework,Installed (Dev)
+JavaScript/Node Libraries,22,@tailwindcss/postcss,4.3.3,PostCSS plugin for Tailwind CSS,Installed (Dev)
+JavaScript/Node Libraries,23,typescript,5.9.3,TypeScript language compiler,Installed (Dev)
+JavaScript/Node Libraries,24,tsx,4.23.15,TypeScript execute runtime,Installed (Dev)
+JavaScript/Node Libraries,25,eslint,9.39.5,JavaScript and TypeScript linter,Installed (Dev)
+JavaScript/Node Libraries,26,eslint-config-next,16.3.0,Next.js ESLint configuration,Installed (Dev)
+Database & Data Storage,1,PostgreSQL (Neon Serverless),PostgreSQL 16+,Cloud relational and biometric database,Active / Production
+Database & Data Storage,2,SQLite,SQLite 3,Local zero-config development database,Active / Dev Mode
+Database & Data Storage,3,Prisma ORM,6.19.3,Database schema modeling and migrations,Active / Production
+Database & Data Storage,4,SQLAlchemy,2.1.4,Python ORM for FastAPI backend,Active / Production
+Database & Data Storage,5,PostgreSQL Schema,schema.postgresql.prisma,Relational schema for cloud deployment,Active / Production
+Database & Data Storage,6,SQLite Schema,schema.prisma,Relational schema for local development,Active / Dev Mode
+Database & Data Storage,7,Dynamic Prisma Switcher,prepare-prisma.js,Dynamic Prisma client generator,Active / Production
+Database & Data Storage,8,In-Database Vector Storage,Relational TEXT / JSON,Embedded 128D vectors in relational records,Active / Production
+Authentication & Security,1,JSON Web Tokens (JWT),jose 6.2.13 / python-jose 3.5.0,Stateless token security with HS256 algorithm,Active / Production
+Authentication & Security,2,HTTP-Only Cookies,caias_auth_token,Secure cookie delivery blocking XSS attacks,Active / Production
+Authentication & Security,3,bcrypt Password Hashing,bcryptjs 3.0.3 / bcrypt 5.0.0,Salted password hashing for accounts,Active / Production
+Authentication & Security,4,Role-Based Access Control,Custom Auth Guard,Three-tier RBAC (Admin Faculty Student),Active / Production
+Authentication & Security,5,Next.js Proxy Middleware,src/middleware.ts,Edge route interceptor protecting private routes,Active / Production
+Authentication & Security,6,Anti-Spoofing Liveness Checks,Laplacian Variance,Blocks screen and paper photo spoofing,Active / Production
+Authentication & Security,7,Cryptographic Audit Logging,Prisma AuditLog Model,Immutable audit records for all operations,Active / Production
+APIs & Functions,1,Next.js App Router API Handlers,16.3.0,29 active RESTful core college endpoints,Active / Production
+APIs & Functions,2,FastAPI Endpoints,0.143.0,10 specialized computer vision endpoints,Active / Production
+APIs & Functions,3,POST /api/auth/login,Custom Function,Generates signed JWT session on credentials verify,Active / Production
+APIs & Functions,4,POST /api/auth/register,Custom Function,Student registration with multi-view biometrics,Active / Production
+APIs & Functions,5,POST /api/ai/verify-face,Custom Function,Live camera frame verification against candidates,Active / Production
+APIs & Functions,6,DELETE /api/admin/students/[id],Custom Function,Cascading safe student and user deletion,Active / Production
+APIs & Functions,7,DELETE /api/admin/faculty/[id],Custom Function,Cascading safe faculty profile and schedule deletion,Active / Production
+APIs & Functions,8,GET /api/public/academic-catalog,Custom Function,Public departments courses and sections,Active / Production
+APIs & Functions,9,GET /api/reports/export,Custom Function,Streaming PDF Excel and CSV export generation,Active / Production
+APIs & Functions,10,generateDeterministicFaceEmbedding,Custom Function,High-entropy vector generator for serverless,Active / Production
+APIs & Functions,11,calculateCosineSimilarity,Custom Function,Cosine distance formula for 128D vectors,Active / Production
+Development Tools,1,Git,2.46.0,Distributed version control system,Active / Dev Mode
+Development Tools,2,GitHub CLI (gh),2.55.0,GitHub authentication and repository management,Active / Dev Mode
+Development Tools,3,npm,12.1.0,Node.js package manager,Active / Dev Mode
+Development Tools,4,pip,25.1.1,Python package installer,Active / Dev Mode
+Development Tools,5,Python Virtual Environment (venv),Python 3.13,Isolated execution sandbox for Python,Active / Dev Mode
+Development Tools,6,Node.js,24.18.0,Server-side JavaScript runtime engine,Active / Dev Mode
+Development Tools,7,PowerShell,7.x / 5.1,Windows shell scripting environment,Active / Dev Mode
+Development Tools,8,Vercel CLI,65.14.0,Cloud deployment CLI tool,Active / Dev Mode
+Development Tools,9,Cloudflare Tunnel,2026.8.2,Secure public HTTPS tunnel daemon,Active / Dev Mode
+Deployment & Hosting,1,Vercel,Platform,Production cloud host for Next.js web application,Active / Production
+Deployment & Hosting,2,Neon PostgreSQL,AWS us-east-1,Serverless cloud PostgreSQL database,Active / Production
+Deployment & Hosting,3,Render,Blueprint (render.yaml),Container specification for FastAPI AI microservice,Configured / Ready
+Deployment & Hosting,4,GitHub,Sachin2716/ai-smart-attendance-system,Remote Git code repository and CI source,Active / Production
+Deployment & Hosting,5,Cloudflare,trycloudflare.com,Public test tunnel for mobile and remote testing,Active / Dev Mode
+Testing Tools,1,Node.js Native Test Runner,24.18.0,Built-in unit and integration test runner,Active / Used
+Testing Tools,2,tsx,4.23.15,TypeScript execute runtime for tests,Active / Used
+Testing Tools,3,pytest,9.1.1,Python test framework for FastAPI endpoints,Active / Used
+Testing Tools,4,tests/pose_validation.test.ts,Custom Suite,15 unit tests for head-pose angular math,Active / Used (100% Pass)
+Testing Tools,5,tests/system_workflows.test.ts,Custom Suite,15 integration tests for full academic workflows,Active / Used (100% Pass)
+Testing Tools,6,backend/tests/test_attendance.py,Custom Suite,Unit tests for FastAPI face matching,Active / Used
+UI/UX & Animation,1,Lucide React Icons,1.29.0,Iconography across admin faculty and student portals,Active / Production
+UI/UX & Animation,2,Framer Motion,13.0.0,Fluid UI transitions scanning lines and logo anims,Active / Production
+UI/UX & Animation,3,Recharts,3.10.1,Responsive charting for attendance analytics,Active / Production
+UI/UX & Animation,4,Sonner,2.0.8,Dark-themed toast feedback notifications,Active / Production
+UI/UX & Animation,5,Canvas Confetti,1.9.4,Celebration particle effects on attendance mark,Active / Production
+UI/UX & Animation,6,Face Scanning Reticle Guide,Custom SVG / CSS,Interactive oval reticle with green/red states,Active / Production
+UI/UX & Animation,7,700ms Countdown Progress Ring,Custom SVG,Real-time circular progress ring for steady pose,Active / Production
+UI/UX & Animation,8,Cyberpunk Dark Palette,Custom Design System,Electric blue (#3B82F6) and Cyan (#22D3EE) on (#09090B),Active / Production
+Other Technologies,1,WebRTC / MediaDevices API,Browser Native,Direct webcam video stream access,Active / Production
+Other Technologies,2,HTML5 Canvas 2D Context,Browser Native,Frame capture and base64 DataURI encoding,Active / Production
+Other Technologies,3,Node.js System CA,Node.js 24,Windows certificate authority integration,Active / Production
+Other Technologies,4,TextEncoder / TextDecoder API,Web Standard,UTF-8 byte array conversion for cryptographic keys,Active / Production
+Other Technologies,5,AbortController API,Web Standard,Request timeout controller for microservices,Active / Production
+Other Technologies,6,UUID v4 Generator,Web Crypto / Prisma,Unique 128-bit entity identifier generator,Active / Production
+Other Technologies,7,OpenAPI / Swagger UI,3.1.0,Interactive API documentation on FastAPI,Active / Production
