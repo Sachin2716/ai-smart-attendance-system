@@ -248,9 +248,8 @@ export default function FacultyAttendancePage() {
         const fetchedRecords = data.session.records || [];
         setRecords(fetchedRecords);
 
-        // If no students enrolled in this section, show report state immediately
-        if (fetchedRecords.length === 0) {
-          setShowCompletionReport(true);
+        if (fetchedRecords.length > 0) {
+          setShowCompletionReport(false);
         }
       }
     } catch (e) {
@@ -309,14 +308,17 @@ export default function FacultyAttendancePage() {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
 
+        const targetStudentId = recognitionMode === '1:1' && currentStudent ? currentStudent.studentId : undefined;
+        const effectiveMode = recognitionMode === '1:1' && !currentStudent ? '1:N' : recognitionMode;
+
         const res = await fetch('/api/ai/verify-face', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sessionId: activeSession.id,
             imageBase64,
-            studentId: recognitionMode === '1:1' ? currentStudent?.studentId : undefined,
-            mode: recognitionMode,
+            studentId: targetStudentId,
+            mode: effectiveMode,
           }),
         });
 
@@ -331,6 +333,37 @@ export default function FacultyAttendancePage() {
           });
           setAiMessage(`IDENTITY VERIFIED: ${data.student.name} (${data.student.rollNumber}) — ATTENDANCE MARKED`);
           toast.success(`Identity Verified: ${data.student.name}! Attendance Marked PRESENT.`);
+
+          // Immediate optimistic UI roster update
+          setRecords((prev) => {
+            const exists = prev.some(
+              (r) => r.studentId === data.student.id || r.student?.rollNumber === data.student.rollNumber
+            );
+            if (exists) {
+              return prev.map((r) =>
+                r.studentId === data.student.id || r.student?.rollNumber === data.student.rollNumber
+                  ? { ...r, status: 'PRESENT', verificationMethod: 'FACE_AI' }
+                  : r
+              );
+            } else {
+              return [
+                ...prev,
+                {
+                  id: data.record?.id || `rec-${Date.now()}`,
+                  sessionId: activeSession.id,
+                  studentId: data.student.id,
+                  status: 'PRESENT',
+                  verificationMethod: 'FACE_AI',
+                  student: {
+                    id: data.student.id,
+                    name: data.student.name,
+                    rollNumber: data.student.rollNumber,
+                    faceTemplate: { status: 'ENROLLED' },
+                  },
+                },
+              ];
+            }
+          });
           
           await fetchSessionDetails(activeSession.id);
 
@@ -695,7 +728,7 @@ export default function FacultyAttendancePage() {
           </div>
 
           {/* SHOW REPORT IF COMPLETED OR REQUESTED */}
-          {showCompletionReport || totalCount === 0 ? (
+          {showCompletionReport && totalCount > 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}

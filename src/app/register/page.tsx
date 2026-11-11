@@ -189,7 +189,7 @@ export default function RegisterPage() {
           CAIAS Student Registration
         </h1>
         <p className="mt-2 text-xs text-[#9CA3AF]">
-          Enter your academic details and complete your 4-pose automatic biometric face enrollment.
+          Enter your academic details and complete your 6-angle automatic biometric face enrollment.
         </p>
 
         {/* Steps Breadcrumb */}
@@ -212,7 +212,7 @@ export default function RegisterPage() {
             }`}
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>2. 4-Pose Biometrics</span>
+            <span>2. 6-Pose Biometrics</span>
           </div>
         </div>
       </div>

@@ -92,10 +92,13 @@ const POPULATION_STDS = [
  * Detect face bounding box and check for multiple distinct faces in frame.
  */
 export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetectionDetails> {
+  let origW = 640;
+  let origH = 480;
+
   try {
     const meta = await sharp(imgBuffer).metadata();
-    const origW = meta.width || 640;
-    const origH = meta.height || 480;
+    origW = meta.width || 640;
+    origH = meta.height || 480;
 
     const sampleW = 160;
     const sampleH = Math.max(20, Math.round(160 * (origH / origW)));
@@ -126,8 +129,8 @@ export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetect
         const Cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
         const Cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
-        // Human skin tone tight chromatic clustering
-        if (Cb >= 75 && Cb <= 135 && Cr >= 130 && Cr <= 185 && Y > 25) {
+        // Robust human skin chromatic clustering across diverse skin tones (Fitzpatrick I-VI)
+        if (Cb >= 65 && Cb <= 150 && Cr >= 120 && Cr <= 195 && Y >= 20) {
           skinPixelCount++;
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
@@ -145,20 +148,19 @@ export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetect
       }
     }
 
-    // Two distinct faces: skin on both left and right sides, but a non-skin background gap in center
+    // Two distinct faces: skin on both left and right sides of the camera frame
     let faceCount = 1;
-    if (leftSkinCount >= 45 && rightSkinCount >= 45 && centerStripSkinCount < 8) {
+    if (leftSkinCount >= 10 && rightSkinCount >= 10 && (centerStripSkinCount < 30 || (leftSkinCount + rightSkinCount) > 100)) {
       faceCount = 2;
     }
 
-    if (skinPixelCount >= 40 && maxX > minX && maxY > minY) {
+    if (skinPixelCount >= 20 && maxX > minX && maxY > minY) {
       const scaleX = origW / sampleW;
       const scaleY = origH / sampleH;
       const rawBoxW = (maxX - minX) * scaleX;
       const rawBoxH = (maxY - minY) * scaleY;
 
       // Anthropometric face geometry: Head height is at most 1.35x head width
-      // Anything below that is neck / collar / chest skin.
       const faceH = Math.min(rawBoxH, rawBoxW * 1.35);
       const faceW = Math.min(rawBoxW, faceH * 1.15);
 
@@ -181,9 +183,15 @@ export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetect
     console.warn('[FaceCrop] Skin clustering warning:', err);
   }
 
+  // Consistent central portrait bounding box fallback (focuses on subject's head, avoids wide background distortion)
+  const fallbackW = Math.max(20, Math.round(origW * 0.60));
+  const fallbackH = Math.max(20, Math.round(origH * 0.75));
+  const fallbackLeft = Math.max(0, Math.round((origW - fallbackW) / 2));
+  const fallbackTop = Math.max(0, Math.round((origH - fallbackH) * 0.35));
+
   return {
     faceCount: 1,
-    box: { left: 0, top: 0, width: 0, height: 0 },
+    box: { left: fallbackLeft, top: fallbackTop, width: fallbackW, height: fallbackH },
   };
 }
 
@@ -192,10 +200,18 @@ export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetect
  */
 export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceLivenessResult> {
   try {
+    const meta = await sharp(imgBuffer).metadata();
+    const origW = meta.width || 640;
+    const origH = meta.height || 480;
+
     const detection = await detectFacesAndCount(imgBuffer);
     let pipeline = sharp(imgBuffer);
-    if (detection.box.width > 30 && detection.box.height > 30) {
-      pipeline = pipeline.extract(detection.box);
+    if (detection.box.width > 20 && detection.box.height > 20) {
+      const left = Math.max(0, Math.min(origW - 10, detection.box.left));
+      const top = Math.max(0, Math.min(origH - 10, detection.box.top));
+      const width = Math.max(10, Math.min(origW - left, detection.box.width));
+      const height = Math.max(10, Math.min(origH - top, detection.box.height));
+      pipeline = pipeline.extract({ left, top, width, height });
     }
 
     const { data: rawRgb } = await pipeline
@@ -215,7 +231,7 @@ export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceL
       const g = rawRgb[i * 3 + 1];
       const b = rawRgb[i * 3 + 2];
 
-      if (r > 252 && g > 252 && b > 252) {
+      if (r > 254 && g > 254 && b > 254) {
         specularHotspotPixels++;
       }
 
@@ -239,8 +255,8 @@ export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceL
     const chromaDispersion = (Math.sqrt(varCb / totalPixels) + Math.sqrt(varCr / totalPixels)) / 2;
     const specularRatio = specularHotspotPixels / totalPixels;
 
-    // Printed monochrome photos have negligible color dispersion (< 1.2)
-    if (chromaDispersion < 1.2) {
+    // Printed monochrome photos have negligible color dispersion (< 0.6)
+    if (chromaDispersion < 0.6) {
       return {
         isLive: false,
         livenessScore: 0.25,
@@ -248,8 +264,8 @@ export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceL
       };
     }
 
-    // Heavy specular reflections covering > 45% of facial skin indicate screen display re-photograph attack
-    if (specularRatio > 0.45) {
+    // Heavy specular reflections covering > 50% of facial skin indicate screen display re-photograph attack
+    if (specularRatio > 0.50) {
       return {
         isLive: false,
         livenessScore: 0.35,
@@ -287,10 +303,18 @@ export async function extractFaceBiometricVector(
     const imgBuffer = Buffer.from(cleanB64, 'base64');
 
     // 1. Detect face bounding box to eliminate background noise and scale variation
+    const meta = await sharp(imgBuffer).metadata();
+    const origW = meta.width || 640;
+    const origH = meta.height || 480;
+
     const detection = await detectFacesAndCount(imgBuffer);
     let pipeline = sharp(imgBuffer);
-    if (detection.box.width > 0 && detection.box.height > 0) {
-      pipeline = pipeline.extract(detection.box);
+    if (detection.box.width > 20 && detection.box.height > 20) {
+      const left = Math.max(0, Math.min(origW - 10, detection.box.left));
+      const top = Math.max(0, Math.min(origH - 10, detection.box.top));
+      const width = Math.max(10, Math.min(origW - left, detection.box.width));
+      const height = Math.max(10, Math.min(origH - top, detection.box.height));
+      pipeline = pipeline.extract({ left, top, width, height });
     }
     if (flipHorizontal) {
       pipeline = pipeline.flop();
@@ -318,6 +342,11 @@ export async function extractFaceBiometricVector(
     for (let i = 0; i < totalPixels; i++) {
       variance += (data[i] - mean) ** 2;
     }
+
+    if (variance / totalPixels < 2.0) {
+      throw new Error('Image has insufficient visual detail or camera is covered.');
+    }
+
     const std = Math.sqrt(variance / totalPixels) + 1e-4;
 
     for (let i = 0; i < totalPixels; i++) {

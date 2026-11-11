@@ -182,6 +182,26 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Automatically attach newly enrolled student to any ongoing active attendance sessions
+      const activeSessions = await tx.attendanceSession.findMany({
+        where: {
+          classSectionId,
+          status: 'ACTIVE',
+        },
+      });
+
+      for (const sess of activeSessions) {
+        await tx.attendanceRecord.create({
+          data: {
+            sessionId: sess.id,
+            studentId: newStudent.id,
+            status: 'ABSENT',
+            verificationMethod: 'MANUAL',
+            markedById: sess.facultyId,
+          },
+        });
+      }
+
       // Save 128D Master FaceTemplate
       await tx.faceTemplate.create({
         data: {

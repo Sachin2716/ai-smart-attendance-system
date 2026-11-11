@@ -41,9 +41,9 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       whereClause.OR = [
-        { name: { contains: search } },
-        { rollNumber: { contains: search } },
-        { email: { contains: search } },
+        { name: { contains: search, mode: 'insensitive' } },
+        { rollNumber: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
       ];
     }
     if (departmentId) whereClause.departmentId = departmentId;
@@ -185,6 +185,26 @@ export async function POST(request: NextRequest) {
           status: 'ENROLLED',
         },
       });
+
+      // Automatically attach student to any currently active attendance sessions
+      const activeSessions = await tx.attendanceSession.findMany({
+        where: {
+          classSectionId,
+          status: 'ACTIVE',
+        },
+      });
+
+      for (const sess of activeSessions) {
+        await tx.attendanceRecord.create({
+          data: {
+            sessionId: sess.id,
+            studentId: newStudent.id,
+            status: 'ABSENT',
+            verificationMethod: 'MANUAL',
+            markedById: sess.facultyId,
+          },
+        });
+      }
 
       if (masterEmbedding) {
         await tx.faceTemplate.create({

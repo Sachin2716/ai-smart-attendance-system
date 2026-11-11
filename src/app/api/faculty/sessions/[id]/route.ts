@@ -45,6 +45,49 @@ export async function GET(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
+    // Auto-synchronize missing enrolled students into active sessions
+    if (session.status === 'ACTIVE') {
+      const enrollments = await prisma.enrollment.findMany({
+        where: {
+          classSectionId: session.classSectionId,
+          status: 'ENROLLED',
+        },
+        select: { studentId: true },
+      });
+
+      const existingStudentIds = new Set(session.records.map((r) => r.studentId));
+      const missingStudentIds = enrollments
+        .map((e) => e.studentId)
+        .filter((id) => !existingStudentIds.has(id));
+
+      if (missingStudentIds.length > 0) {
+        await prisma.attendanceRecord.createMany({
+          data: missingStudentIds.map((studentId) => ({
+            sessionId: session.id,
+            studentId,
+            status: 'ABSENT',
+            verificationMethod: 'MANUAL',
+            markedById: session.facultyId,
+          })),
+          skipDuplicates: true,
+        });
+
+        const refreshedRecords = await prisma.attendanceRecord.findMany({
+          where: { sessionId: session.id },
+          include: {
+            student: {
+              include: {
+                faceTemplate: { select: { status: true } },
+              },
+            },
+          },
+          orderBy: { student: { rollNumber: 'asc' } },
+        });
+
+        session.records = refreshedRecords;
+      }
+    }
+
     return NextResponse.json({ success: true, session });
   } catch (error: any) {
     console.error('Fetch session details error:', error);

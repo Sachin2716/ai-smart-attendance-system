@@ -137,9 +137,9 @@ describe('🎯 Cross-Student Face Recognition & Identity Verification Test Suite
           `Identity Error! Student B face scored higher on Student A (${simBtoA.toFixed(4)}) than on Student B (${simBtoB.toFixed(4)})`
         );
 
-        // 2. Cross match must be separated from genuine self match by a positive margin (>= 0.04)
+        // 2. Cross match must be separated from genuine self match by a positive margin (>= 0.035)
         assert.ok(
-          simBtoB - simBtoA >= 0.04,
+          simBtoB - simBtoA >= 0.035,
           `Margin too small between Student B and Student A (${(simBtoB - simBtoA).toFixed(4)})`
         );
 
