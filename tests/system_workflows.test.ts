@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../.env.production.local'), override: true });
+dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import { PrismaClient } from '@prisma/client';

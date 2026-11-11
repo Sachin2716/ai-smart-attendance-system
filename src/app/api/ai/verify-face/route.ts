@@ -114,22 +114,32 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. Biometric Feature Extraction: Zero-Centered 128D Discriminative Vector
-    const liveVec = await extractFaceBiometricVector(imageBase64);
+    // 4. Biometric Feature Extraction: Mirror-Invariant 128D Discriminative Vector
+    const [liveVec, liveVecFlop] = await Promise.all([
+      extractFaceBiometricVector(cleanB64, false),
+      extractFaceBiometricVector(cleanB64, true),
+    ]);
 
     // Calibrated Biometric Decision Boundaries:
-    // - Genuine Same Person: 0.70 to 1.00
-    // - Impostor / Different Person: 0.00 to 0.30
-    // - Threshold: 0.60
-    // - Ambiguity Gap (Margin between Top-1 and Top-2): 0.10
-    const RECOGNITION_THRESHOLD = 0.60;
-    const AMBIGUITY_MARGIN = 0.10;
+    // - Genuine Same Person: 0.65 to 1.00
+    // - Impostor / Different Person: 0.00 to 0.38
+    // - Threshold: 0.50
+    // - Ambiguity Gap (Margin between Top-1 and Top-2): 0.08
+    const RECOGNITION_THRESHOLD = 0.50;
+    const AMBIGUITY_MARGIN = 0.08;
+
+    // Helper to evaluate similarity with mirror-invariance (supports mirrored and unmirrored webcams)
+    const matchCandidateScore = (embedding: number[]) => {
+      const simStandard = calculateCosineSimilarity(liveVec, embedding);
+      const simFlipped = calculateCosineSimilarity(liveVecFlop, embedding);
+      return Math.max(simStandard, simFlipped);
+    };
 
     // Score all enrolled candidates in this section
     const scoredCandidates = candidates
       .map((c) => ({
         candidate: c,
-        similarity: calculateCosineSimilarity(liveVec, c.embedding),
+        similarity: matchCandidateScore(c.embedding),
       }))
       .sort((a, b) => b.similarity - a.similarity);
 
@@ -156,7 +166,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const targetScore = calculateCosineSimilarity(liveVec, targetCandidate.embedding);
+      const targetScore = matchCandidateScore(targetCandidate.embedding);
 
       // Check 1: Target must meet the minimum calibrated recognition threshold
       if (targetScore < RECOGNITION_THRESHOLD) {

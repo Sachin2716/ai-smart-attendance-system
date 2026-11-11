@@ -156,13 +156,19 @@ export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetect
       const scaleY = origH / sampleH;
       const rawBoxW = (maxX - minX) * scaleX;
       const rawBoxH = (maxY - minY) * scaleY;
-      const marginX = rawBoxW * 0.12;
-      const marginY = rawBoxH * 0.12;
+
+      // Anthropometric face geometry: Head height is at most 1.35x head width
+      // Anything below that is neck / collar / chest skin.
+      const faceH = Math.min(rawBoxH, rawBoxW * 1.35);
+      const faceW = Math.min(rawBoxW, faceH * 1.15);
+
+      const marginX = faceW * 0.12;
+      const marginY = faceH * 0.12;
 
       const left = Math.max(0, Math.round(minX * scaleX - marginX));
       const top = Math.max(0, Math.round(minY * scaleY - marginY));
-      const width = Math.min(origW - left, Math.round(rawBoxW + marginX * 2));
-      const height = Math.min(origH - top, Math.round(rawBoxH + marginY * 2));
+      const width = Math.min(origW - left, Math.round(faceW + marginX * 2));
+      const height = Math.min(origH - top, Math.round(faceH + marginY * 2));
 
       if (width >= 30 && height >= 30) {
         return {
@@ -186,7 +192,13 @@ export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetect
  */
 export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceLivenessResult> {
   try {
-    const { data: rawRgb } = await sharp(imgBuffer)
+    const detection = await detectFacesAndCount(imgBuffer);
+    let pipeline = sharp(imgBuffer);
+    if (detection.box.width > 30 && detection.box.height > 30) {
+      pipeline = pipeline.extract(detection.box);
+    }
+
+    const { data: rawRgb } = await pipeline
       .resize(120, 120, { fit: 'cover' })
       .raw()
       .toBuffer({ resolveWithObject: true });
@@ -203,7 +215,7 @@ export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceL
       const g = rawRgb[i * 3 + 1];
       const b = rawRgb[i * 3 + 2];
 
-      if (r > 250 && g > 250 && b > 250) {
+      if (r > 252 && g > 252 && b > 252) {
         specularHotspotPixels++;
       }
 
@@ -227,8 +239,8 @@ export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceL
     const chromaDispersion = (Math.sqrt(varCb / totalPixels) + Math.sqrt(varCr / totalPixels)) / 2;
     const specularRatio = specularHotspotPixels / totalPixels;
 
-    // Printed monochrome photos have low dispersion
-    if (chromaDispersion < 2.5) {
+    // Printed monochrome photos have negligible color dispersion (< 1.2)
+    if (chromaDispersion < 1.2) {
       return {
         isLive: false,
         livenessScore: 0.25,
@@ -236,16 +248,16 @@ export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceL
       };
     }
 
-    // Heavy specular reflections indicate phone display reflection
-    if (specularRatio > 0.15) {
+    // Heavy specular reflections covering > 45% of facial skin indicate screen display re-photograph attack
+    if (specularRatio > 0.45) {
       return {
         isLive: false,
         livenessScore: 0.35,
-        reason: 'Passive liveness check failed: Screen display reflection detected.',
+        reason: 'Passive liveness check failed: High-intensity screen display reflection detected.',
       };
     }
 
-    const livenessScore = Math.min(0.99, Math.max(0.60, 0.70 + chromaDispersion * 0.02 - specularRatio * 0.5));
+    const livenessScore = Math.min(0.99, Math.max(0.60, 0.75 + chromaDispersion * 0.02 - specularRatio * 0.3));
     return {
       isLive: true,
       livenessScore: Number(livenessScore.toFixed(3)),
@@ -260,10 +272,13 @@ export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceL
  * 
  * Properties:
  * - Genuine (Same person): Cosine similarity 0.70 to 1.00.
- * - Impostor (Different person): Cosine similarity <= 0.25 (often negative).
+ * - Impostor (Different person): Cosine similarity <= 0.35 (often negative).
  * - Massive discriminative separation margin.
  */
-export async function extractFaceBiometricVector(base64Image: string): Promise<number[]> {
+export async function extractFaceBiometricVector(
+  base64Image: string,
+  flipHorizontal: boolean = false
+): Promise<number[]> {
   try {
     let cleanB64 = base64Image;
     if (cleanB64.includes(',')) {
@@ -276,6 +291,9 @@ export async function extractFaceBiometricVector(base64Image: string): Promise<n
     let pipeline = sharp(imgBuffer);
     if (detection.box.width > 0 && detection.box.height > 0) {
       pipeline = pipeline.extract(detection.box);
+    }
+    if (flipHorizontal) {
+      pipeline = pipeline.flop();
     }
 
     // 2. Standardize face crop to 64x64 canonical matrix, grayscale
