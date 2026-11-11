@@ -286,12 +286,16 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
     switch (id) {
       case 'CENTER':
         return <User className="w-5 h-5 text-cyan-400" />;
+      case 'NATURAL':
+        return <Sparkles className="w-5 h-5 text-cyan-400" />;
       case 'LEFT':
         return <ArrowLeft className="w-5 h-5 text-cyan-400" />;
       case 'RIGHT':
         return <ArrowRight className="w-5 h-5 text-cyan-400" />;
       case 'UP':
         return <ArrowUp className="w-5 h-5 text-cyan-400" />;
+      case 'DOWN':
+        return <ArrowDown className="w-5 h-5 text-cyan-400" />;
     }
   };
 
