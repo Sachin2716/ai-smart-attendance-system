@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
 
       // Extract 128D HOG biometric facial feature vector from live camera frame
       const liveVec = await extractFaceBiometricVector(imageBase64);
-      const THRESHOLD = 0.68; // Strict threshold: prevents different faces / impostors from matching
+      const THRESHOLD = 0.70; // High-precision threshold: ensures only registered face matches, rejects impostors
 
       // 1. If studentId was specified from queue, strictly verify against that candidate
       const targetCandidate = studentId

@@ -125,6 +125,19 @@ export function validatePoseForStep(
       break;
     }
 
+    case 'NATURAL': {
+      // NATURAL: Frontal confirmation
+      const isCentered = Math.abs(yaw) <= config.CENTER_YAW_TOLERANCE + 4 && Math.abs(pitch) <= config.CENTER_PITCH_TOLERANCE + 4;
+      if (isCentered) {
+        isDirectionSatisfied = true;
+        feedbackMessage = '✓ Natural pose captured — auto-capturing...';
+      } else {
+        statusCode = 'INCORRECT_DIRECTION';
+        feedbackMessage = 'Keep facing forward with natural posture';
+      }
+      break;
+    }
+
     case 'LEFT': {
       // LEFT: User tilts head to their left (yaw negative)
       if (yaw <= -config.MIN_YAW_THRESHOLD && yaw >= -config.MAX_YAW_PHYSICAL) {
@@ -169,6 +182,21 @@ export function validatePoseForStep(
       }
       break;
     }
+
+    case 'DOWN': {
+      // DOWN: User tilts head downward (pitch negative)
+      if (pitch <= -config.MIN_PITCH_THRESHOLD && pitch >= -config.MAX_PITCH_PHYSICAL) {
+        isDirectionSatisfied = true;
+        feedbackMessage = '✓ Downward tilt detected — auto-capturing...';
+      } else if (pitch < -config.MAX_PITCH_PHYSICAL) {
+        statusCode = 'OUTSIDE_PHYSICAL_RANGE';
+        feedbackMessage = 'Tilted too low — raise your chin slightly';
+      } else {
+        statusCode = 'TOO_CLOSE_TO_CENTER';
+        feedbackMessage = 'Tilt your head slightly downward';
+      }
+      break;
+    }
   }
 
   const isValid = isQualitySatisfied && isDirectionSatisfied;
@@ -189,11 +217,15 @@ function getStepTargetDescription(stepId: PoseStepId): string {
   switch (stepId) {
     case 'CENTER':
       return 'Look Straight';
+    case 'NATURAL':
+      return 'Natural Frontal';
     case 'LEFT':
       return 'Tilt Left';
     case 'RIGHT':
       return 'Tilt Right';
     case 'UP':
       return 'Tilt Upward';
+    case 'DOWN':
+      return 'Tilt Downward';
   }
 }

@@ -22,7 +22,7 @@ const studentRegisterSchema = z.object({
     .array(
       z
         .object({
-          direction: z.enum(['FRONT', 'NORMAL', 'LEFT', 'RIGHT', 'UP', 'NATURAL']),
+          direction: z.enum(['FRONT', 'NORMAL', 'LEFT', 'RIGHT', 'UP', 'NATURAL', 'DOWN']),
           image_base64: z.string().optional(),
           imageBase64: z.string().optional(),
         })

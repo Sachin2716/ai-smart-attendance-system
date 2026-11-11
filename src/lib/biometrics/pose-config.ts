@@ -64,7 +64,7 @@ export const DEFAULT_POSE_CONFIG: PoseThresholdConfig = {
   MIN_SKIN_DENSITY: 0.04,        // Responsive skin detection
 };
 
-export type PoseStepId = 'CENTER' | 'LEFT' | 'RIGHT' | 'UP';
+export type PoseStepId = 'CENTER' | 'NATURAL' | 'LEFT' | 'RIGHT' | 'UP' | 'DOWN';
 
 export interface PoseStepMetadata {
   id: PoseStepId;
@@ -72,7 +72,7 @@ export interface PoseStepMetadata {
   title: string;
   instruction: string;
   angleConditionDescription: string;
-  backendDirection: 'NORMAL' | 'LEFT' | 'RIGHT' | 'UP';
+  backendDirection: 'NORMAL' | 'NATURAL' | 'LEFT' | 'RIGHT' | 'UP' | 'DOWN';
 }
 
 export const POSE_STEPS: PoseStepMetadata[] = [
@@ -80,13 +80,21 @@ export const POSE_STEPS: PoseStepMetadata[] = [
     id: 'CENTER',
     stepNumber: 1,
     title: 'Look Straight',
-    instruction: 'Look straight at the camera',
-    angleConditionDescription: 'Center / Straight',
+    instruction: 'Look directly into the camera',
+    angleConditionDescription: 'Frontal View',
     backendDirection: 'NORMAL',
   },
   {
-    id: 'LEFT',
+    id: 'NATURAL',
     stepNumber: 2,
+    title: 'Natural Pose',
+    instruction: 'Keep a natural expression facing front',
+    angleConditionDescription: 'Natural Frontal Confirmation',
+    backendDirection: 'NATURAL',
+  },
+  {
+    id: 'LEFT',
+    stepNumber: 3,
     title: 'Tilt Left',
     instruction: 'Tilt your head to the left',
     angleConditionDescription: 'Head Tilt Left',
@@ -94,7 +102,7 @@ export const POSE_STEPS: PoseStepMetadata[] = [
   },
   {
     id: 'RIGHT',
-    stepNumber: 3,
+    stepNumber: 4,
     title: 'Tilt Right',
     instruction: 'Tilt your head to the right',
     angleConditionDescription: 'Head Tilt Right',
@@ -102,10 +110,18 @@ export const POSE_STEPS: PoseStepMetadata[] = [
   },
   {
     id: 'UP',
-    stepNumber: 4,
+    stepNumber: 5,
     title: 'Tilt Upward',
-    instruction: 'Tilt your head upward',
+    instruction: 'Tilt your head slightly upward',
     angleConditionDescription: 'Head Tilt Up',
     backendDirection: 'UP',
+  },
+  {
+    id: 'DOWN',
+    stepNumber: 6,
+    title: 'Tilt Downward',
+    instruction: 'Tilt your head slightly downward',
+    angleConditionDescription: 'Head Tilt Down',
+    backendDirection: 'DOWN',
   },
 ];

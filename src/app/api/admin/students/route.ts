@@ -17,7 +17,7 @@ const createStudentSchema = z.object({
   biometricSamples: z
     .array(
       z.object({
-        direction: z.enum(['FRONT', 'LEFT', 'RIGHT', 'UP', 'NATURAL']),
+        direction: z.enum(['FRONT', 'NORMAL', 'LEFT', 'RIGHT', 'UP', 'NATURAL', 'DOWN']),
         image_base64: z.string(),
       })
     )

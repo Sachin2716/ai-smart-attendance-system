@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  ArrowDown,
   User,
   Sparkles,
   Check,
@@ -25,7 +26,7 @@ import { validatePoseForStep } from '@/lib/biometrics/pose-validator';
 import { DirectionalFrameCapture, PoseEstimationResult, PoseValidationResult } from '@/lib/biometrics/pose-types';
 
 export interface DirectionalFrame {
-  direction: 'NORMAL' | 'LEFT' | 'RIGHT' | 'UP' | 'FRONT' | 'NATURAL';
+  direction: 'NORMAL' | 'LEFT' | 'RIGHT' | 'UP' | 'FRONT' | 'NATURAL' | 'DOWN';
   image_base64: string;
 }
 
@@ -68,9 +69,11 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [capturedFrames, setCapturedFrames] = useState<Record<PoseStepId, DirectionalFrameCapture | null>>({
     CENTER: null,
+    NATURAL: null,
     LEFT: null,
     RIGHT: null,
     UP: null,
+    DOWN: null,
   });
 
   const [cameraActive, setCameraActive] = useState(false);
@@ -324,8 +327,8 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
         </div>
       </div>
 
-      {/* 4 Poses Stepper Tabs */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      {/* 6 Poses Stepper Tabs */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-4">
         {POSE_STEPS.map((step, idx) => {
           const isDone = !!capturedFrames[step.id];
           const isCurrent = idx === currentStepIndex;
@@ -507,8 +510,8 @@ export function MultiAngleFaceEnrollment({ onComplete, onCancel }: MultiAngleFac
 
       {/* Captured Poses Gallery & Submission */}
       <div className="mt-4 space-y-4">
-        {/* Thumbnails of the 4 captured poses */}
-        <div className="grid grid-cols-4 gap-2">
+        {/* Thumbnails of the 6 captured poses */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {POSE_STEPS.map((s, idx) => {
             const frame = capturedFrames[s.id];
             const isCurrent = idx === currentStepIndex;

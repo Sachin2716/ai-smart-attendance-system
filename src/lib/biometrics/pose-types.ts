@@ -91,7 +91,7 @@ export interface PoseValidationResult {
 
 export interface DirectionalFrameCapture {
   stepId: PoseStepId;
-  direction: 'NORMAL' | 'LEFT' | 'RIGHT' | 'UP' | 'FRONT' | 'NATURAL';
+  direction: 'NORMAL' | 'LEFT' | 'RIGHT' | 'UP' | 'FRONT' | 'NATURAL' | 'DOWN';
   image_base64: string;
   capturedYaw: number;
   capturedPitch: number;
