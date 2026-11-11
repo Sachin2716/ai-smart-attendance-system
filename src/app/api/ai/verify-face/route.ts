@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { generateDeterministicFaceEmbedding, calculateCosineSimilarity } from '@/lib/biometrics/fallback-embedding';
+import { extractFaceBiometricVector, calculateCosineSimilarity } from '@/lib/biometrics/fallback-embedding';
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth(['FACULTY', 'ADMIN', 'STUDENT']);
@@ -114,16 +114,33 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // 1. If studentId was specified from queue, match that enrolled candidate
+      // Extract 128D HOG biometric facial feature vector from live camera frame
+      const liveVec = await extractFaceBiometricVector(imageBase64);
+      const THRESHOLD = 0.68; // Strict threshold: prevents different faces / impostors from matching
+
+      // 1. If studentId was specified from queue, strictly verify against that candidate
       const targetCandidate = studentId
         ? candidates.find((c) => c.id === studentId || c.roll_number === studentId)
         : null;
 
-      let matchedCandidate = targetCandidate;
+      let matchedCandidate: (typeof candidates)[0] | null = null;
+      let verifiedSimilarity = 0;
 
-      // 2. If no explicit studentId, evaluate vector similarity or match single candidate
-      if (!matchedCandidate) {
-        const liveVec = generateDeterministicFaceEmbedding([{ direction: 'LIVE', image_base64: imageBase64 }]);
+      if (targetCandidate) {
+        const sim = calculateCosineSimilarity(liveVec, targetCandidate.embedding);
+        verifiedSimilarity = sim;
+
+        if (sim >= THRESHOLD) {
+          matchedCandidate = targetCandidate;
+        } else {
+          return NextResponse.json({
+            success: false,
+            aiAvailable: true,
+            error: `Face does not match registered student profile (${targetCandidate.name}). Match confidence: ${(Math.max(0, sim) * 100).toFixed(1)}% (required: ${(THRESHOLD * 100).toFixed(0)}%). Attendance rejected.`,
+          });
+        }
+      } else {
+        // 2. 1:N Identification mode across all candidates
         let bestCandidate = null;
         let highestSimilarity = 0;
 
@@ -135,10 +152,16 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        if (bestCandidate && highestSimilarity >= 0.35) {
+        verifiedSimilarity = highestSimilarity;
+
+        if (bestCandidate && highestSimilarity >= THRESHOLD) {
           matchedCandidate = bestCandidate;
-        } else if (candidates.length === 1) {
-          matchedCandidate = candidates[0];
+        } else {
+          return NextResponse.json({
+            success: false,
+            aiAvailable: true,
+            error: `Unrecognized face detected. Face does not match any enrolled student profile (Highest match: ${(Math.max(0, highestSimilarity) * 100).toFixed(1)}%, required: ${(THRESHOLD * 100).toFixed(0)}%). Attendance rejected.`,
+          });
         }
       }
 
@@ -146,15 +169,9 @@ export async function POST(request: NextRequest) {
         aiResponse = {
           status: 'MATCHED',
           student_id: matchedCandidate.roll_number || matchedCandidate.id,
-          similarity_score: 0.94,
+          similarity_score: Number(verifiedSimilarity.toFixed(4)),
           liveness_score: 0.95,
         };
-      } else {
-        return NextResponse.json({
-          success: false,
-          aiAvailable: true,
-          error: 'Face not matched with registered student profile. Ensure your face is centered and well-lit.',
-        });
       }
     }
 

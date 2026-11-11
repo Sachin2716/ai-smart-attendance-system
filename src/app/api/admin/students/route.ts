@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!masterEmbedding) {
-        masterEmbedding = generateDeterministicFaceEmbedding(biometricSamples);
+        masterEmbedding = await generateDeterministicFaceEmbedding(biometricSamples);
       }
     }
 

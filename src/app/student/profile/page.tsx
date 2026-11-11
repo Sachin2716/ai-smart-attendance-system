@@ -11,10 +11,14 @@ import {
   ShieldCheck,
   QrCode,
   Sparkles,
+  Camera,
 } from 'lucide-react';
+import { MultiAngleFaceEnrollment } from '@/components/biometrics/MultiAngleFaceEnrollment';
 
 export default function StudentProfilePage() {
   const [student, setStudent] = useState<any | null>(null);
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     fetch('/api/student/dashboard')
@@ -105,16 +109,72 @@ export default function StudentProfilePage() {
             </div>
           </div>
 
-          <span
-            className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-              student.isFaceEnrolled
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-            }`}
-          >
-            {student.isFaceEnrolled ? 'VERIFIED' : 'ACTION REQUIRED'}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowEnrollModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors cursor-pointer shadow-sm"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>{student.isFaceEnrolled ? 'Update Face' : 'Enroll Face'}</span>
+            </button>
+            <span
+              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                student.isFaceEnrolled
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+              }`}
+            >
+              {student.isFaceEnrolled ? 'VERIFIED' : 'ACTION REQUIRED'}
+            </span>
+          </div>
         </div>
+
+        {/* Multi-Angle Face Enrollment Modal */}
+        {showEnrollModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl relative">
+              <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                <Camera className="w-5 h-5 text-blue-400" />
+                Facial Biometric Enrollment
+              </h2>
+              <p className="text-xs text-slate-400 mb-4">
+                Capture 4 standard facial orientations (Center, Left, Right, Up) to register your high-precision biometric vector.
+              </p>
+
+              {isUpdating ? (
+                <div className="py-16 text-center text-sm text-blue-400 font-semibold animate-pulse">
+                  Extracting biometric gradients and updating cloud registry...
+                </div>
+              ) : (
+                <MultiAngleFaceEnrollment
+                  onComplete={async (samples) => {
+                    setIsUpdating(true);
+                    try {
+                      const res = await fetch('/api/student/enroll-face', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ samples }),
+                      });
+                      const data = await res.json();
+                      if (res.ok && data.success) {
+                        toast.success('Face template successfully updated!');
+                        setStudent((prev: any) => ({ ...prev, isFaceEnrolled: true }));
+                        setShowEnrollModal(false);
+                      } else {
+                        toast.error(data.error || 'Failed to update face biometrics');
+                      }
+                    } catch {
+                      toast.error('Network error during face enrollment');
+                    } finally {
+                      setIsUpdating(false);
+                    }
+                  }}
+                  onCancel={() => setShowEnrollModal(false)}
+                />
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -127,17 +127,17 @@ export async function POST(request: NextRequest) {
         }
       } else {
         // Fallback to high-entropy normalized 128D vector
-        masterEmbedding = generateDeterministicFaceEmbedding(biometricSamples);
+        masterEmbedding = await generateDeterministicFaceEmbedding(biometricSamples);
         avgLivenessScore = 0.94;
       }
     } catch {
       // Serverless/offline resilient fallback
-      masterEmbedding = generateDeterministicFaceEmbedding(biometricSamples);
+      masterEmbedding = await generateDeterministicFaceEmbedding(biometricSamples);
       avgLivenessScore = 0.94;
     }
 
     if (!masterEmbedding) {
-      masterEmbedding = generateDeterministicFaceEmbedding(biometricSamples);
+      masterEmbedding = await generateDeterministicFaceEmbedding(biometricSamples);
     }
 
     // 5. Default Password Hashing (Default to Student@123 if not provided)
