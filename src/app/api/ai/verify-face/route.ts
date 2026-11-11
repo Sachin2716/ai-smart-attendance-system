@@ -90,18 +90,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. Strict Pre-Processing Gate: Multi-Face Detection
+    // 2. Multi-Face Detection: Identify all face regions in the frame (supports multiple individuals)
     const faceDetection = await detectFacesAndCount(imgBuffer);
-    if (faceDetection.faceCount > 1) {
-      return NextResponse.json({
-        success: false,
-        statusCode: 'MULTIPLE_FACES',
-        aiAvailable: true,
-        error: `Multiple faces detected in frame (${faceDetection.faceCount}). Exactly one student must stand before the camera.`,
-      });
+
+    // Collect all candidate face boxes (all detected faces + main face crop)
+    const faceBoxesToEvaluate: { left: number; top: number; width: number; height: number }[] = [];
+    if (faceDetection.boxes && faceDetection.boxes.length > 0) {
+      faceBoxesToEvaluate.push(...faceDetection.boxes);
+    } else if (faceDetection.box && faceDetection.box.width >= 20) {
+      faceBoxesToEvaluate.push(faceDetection.box);
     }
 
-    // 3. Strict Pre-Processing Gate: Passive Liveness & Anti-Spoofing
+    // 3. Pre-Processing Gate: Passive Liveness & Anti-Spoofing
     const livenessResult = await checkPassiveFaceLiveness(imgBuffer);
     if (!livenessResult.isLive) {
       return NextResponse.json({
@@ -114,11 +114,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. Biometric Feature Extraction: Mirror-Invariant 128D Discriminative Vector
-    const [liveVec, liveVecFlop] = await Promise.all([
-      extractFaceBiometricVector(cleanB64, false),
-      extractFaceBiometricVector(cleanB64, true),
-    ]);
+    // 4. Biometric Feature Extraction across all detected faces with Mirror-Invariance
+    const faceVectors = await Promise.all(
+      faceBoxesToEvaluate.map(async (box) => {
+        const [std, flop] = await Promise.all([
+          extractFaceBiometricVector(cleanB64, false, box),
+          extractFaceBiometricVector(cleanB64, true, box),
+        ]);
+        return { std, flop, box };
+      })
+    );
+
+    // Fallback: If no face boxes produced valid vectors, extract from primary frame
+    if (faceVectors.length === 0) {
+      const [std, flop] = await Promise.all([
+        extractFaceBiometricVector(cleanB64, false),
+        extractFaceBiometricVector(cleanB64, true),
+      ]);
+      faceVectors.push({ std, flop, box: faceDetection.box });
+    }
 
     // Calibrated Biometric Decision Boundaries:
     // - Genuine Same Person: 0.65 to 1.00
@@ -128,11 +142,18 @@ export async function POST(request: NextRequest) {
     const RECOGNITION_THRESHOLD = 0.50;
     const AMBIGUITY_MARGIN = 0.08;
 
-    // Helper to evaluate similarity with mirror-invariance (supports mirrored and unmirrored webcams)
+    // Helper to evaluate similarity with mirror-invariance across ALL detected faces in the frame
     const matchCandidateScore = (embedding: number[]) => {
-      const simStandard = calculateCosineSimilarity(liveVec, embedding);
-      const simFlipped = calculateCosineSimilarity(liveVecFlop, embedding);
-      return Math.max(simStandard, simFlipped);
+      let maxScore = -1;
+      for (const fv of faceVectors) {
+        const simStandard = calculateCosineSimilarity(fv.std, embedding);
+        const simFlipped = calculateCosineSimilarity(fv.flop, embedding);
+        const bestSim = Math.max(simStandard, simFlipped);
+        if (bestSim > maxScore) {
+          maxScore = bestSim;
+        }
+      }
+      return maxScore;
     };
 
     // Score all enrolled candidates in this section

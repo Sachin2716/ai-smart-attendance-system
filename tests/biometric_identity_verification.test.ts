@@ -252,6 +252,74 @@ describe('🎯 Cross-Student Face Recognition & Identity Verification Test Suite
       2,
       'Frame with two distinct faces must be detected with faceCount = 2'
     );
+    assert.ok(
+      detection.boxes && detection.boxes.length >= 2,
+      'Must extract distinct bounding boxes for multiple faces'
+    );
+  });
+
+  // Multiple Faces Verification Gate: Allow multiple faces and verify registered student
+  it('9. Should verify registered student identity even when multiple faces are present in the frame', async () => {
+    const student0 = studentProfiles[0];
+    const face0 = await generateStudentFaceImage(0, 0);
+
+    const impostorFace = await sharp({
+      create: {
+        width: 160,
+        height: 160,
+        channels: 3,
+        background: { r: 50, g: 30, b: 20 },
+      },
+    })
+      .composite([
+        {
+          input: Buffer.from(`
+            <svg width="160" height="160">
+              <ellipse cx="80" cy="80" rx="35" ry="50" fill="#a64d79"/>
+              <ellipse cx="65" cy="70" rx="4" ry="3" fill="#111111"/>
+              <ellipse cx="95" cy="70" rx="4" ry="3" fill="#111111"/>
+              <path d="M 80 75 L 78 95 L 82 95" stroke="#331100" stroke-width="2" fill="none"/>
+              <path d="M 68 115 Q 80 120 92 115" stroke="#661111" stroke-width="2.5" fill="none"/>
+            </svg>
+          `),
+          left: 0,
+          top: 0,
+        },
+      ])
+      .jpeg()
+      .toBuffer();
+
+    const multiFaceBuf = await sharp({
+      create: {
+        width: 320,
+        height: 160,
+        channels: 3,
+        background: { r: 40, g: 42, b: 48 },
+      },
+    })
+      .composite([
+        { input: face0, left: 10, top: 0 },
+        { input: impostorFace, left: 170, top: 0 },
+      ])
+      .jpeg()
+      .toBuffer();
+
+    const detection = await detectFacesAndCount(multiFaceBuf);
+    const boxes = detection.boxes || [detection.box];
+
+    const multiB64 = multiFaceBuf.toString('base64');
+    let bestScoreForStudent0 = -1;
+
+    for (const box of boxes) {
+      const vec = await extractFaceBiometricVector(multiB64, false, box);
+      const sim = calculateCosineSimilarity(vec, student0.masterEmbedding);
+      if (sim > bestScoreForStudent0) bestScoreForStudent0 = sim;
+    }
+
+    assert.ok(
+      bestScoreForStudent0 >= 0.70,
+      `Registered Student 0 must be identified in multi-face frame (got score ${bestScoreForStudent0.toFixed(4)})`
+    );
   });
 
   // Passive Liveness & Spoof Rejection

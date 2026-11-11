@@ -9,6 +9,7 @@ export interface FaceLivenessResult {
 export interface FaceDetectionDetails {
   faceCount: number;
   box: { left: number; top: number; width: number; height: number };
+  boxes?: { left: number; top: number; width: number; height: number }[];
 }
 
 /**
@@ -88,8 +89,17 @@ const POPULATION_STDS = [
   0.533714, 0.739309, 0.226623, 0.401713, 0.40758, 0.695336, 0.265073, 1.72204,
 ];
 
+interface FaceCluster {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  pixelCount: number;
+}
+
 /**
- * Detect face bounding box and check for multiple distinct faces in frame.
+ * Detect face bounding boxes and identify distinct student faces in the frame.
+ * Uses 1D horizontal histogram projections to segment multiple people cleanly.
  */
 export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetectionDetails> {
   let origW = 640;
@@ -103,20 +113,17 @@ export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetect
     const sampleW = 160;
     const sampleH = Math.max(20, Math.round(160 * (origH / origW)));
     const { data: sampleData } = await sharp(imgBuffer)
-      .resize(sampleW, sampleH)
+      .resize(sampleW, sampleH, { fit: 'fill' })
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    let minX = sampleW;
-    let maxX = 0;
-    let minY = sampleH;
-    let maxY = 0;
-    let skinPixelCount = 0;
+    const histX = new Int32Array(sampleW);
+    const minColY = new Int32Array(sampleW).fill(sampleH);
+    const maxColY = new Int32Array(sampleW).fill(0);
 
-    const midX = Math.floor(sampleW / 2);
-    let leftSkinCount = 0;
-    let rightSkinCount = 0;
-    let centerStripSkinCount = 0;
+    let totalSkin = 0;
+    let minOverallX = sampleW, maxOverallX = 0;
+    let minOverallY = sampleH, maxOverallY = 0;
 
     for (let y = 0; y < sampleH; y++) {
       for (let x = 0; x < sampleW; x++) {
@@ -125,73 +132,165 @@ export async function detectFacesAndCount(imgBuffer: Buffer): Promise<FaceDetect
         const g = sampleData[idx + 1];
         const b = sampleData[idx + 2];
 
-        const Y = 0.299 * r + 0.587 * g + 0.114 * b;
-        const Cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
-        const Cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+        // Physiological human skin detection:
+        // Hemoglobin & melanin reflectance: R > G, R > B, clear chrominance separation
+        const isSkin =
+          r > 55 &&
+          g > 30 &&
+          b > 20 &&
+          r > g &&
+          r > b &&
+          r - g >= 8 &&
+          r - b >= 12 &&
+          Math.abs(r - g) < 115;
 
-        // Robust human skin chromatic clustering across diverse skin tones (Fitzpatrick I-VI)
-        if (Cb >= 65 && Cb <= 150 && Cr >= 120 && Cr <= 195 && Y >= 20) {
-          skinPixelCount++;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-
-          if (x < midX - 12) {
-            leftSkinCount++;
-          } else if (x > midX + 12) {
-            rightSkinCount++;
-          } else {
-            centerStripSkinCount++;
-          }
+        if (isSkin) {
+          totalSkin++;
+          histX[x]++;
+          if (y < minColY[x]) minColY[x] = y;
+          if (y > maxColY[x]) maxColY[x] = y;
+          if (x < minOverallX) minOverallX = x;
+          if (x > maxOverallX) maxOverallX = x;
+          if (y < minOverallY) minOverallY = y;
+          if (y > maxOverallY) maxOverallY = y;
         }
       }
     }
 
-    // Two distinct faces: skin on both left and right sides of the camera frame
-    let faceCount = 1;
-    if (leftSkinCount >= 10 && rightSkinCount >= 10 && (centerStripSkinCount < 30 || (leftSkinCount + rightSkinCount) > 100)) {
-      faceCount = 2;
-    }
+    if (totalSkin >= 20) {
+      // Find discrete face clusters separated by gaps of non-skin background
+      const clusters: FaceCluster[] = [];
+      let inCluster = false;
+      let curMinX = 0;
+      let curMaxX = 0;
+      let curMinY = sampleH;
+      let curMaxY = 0;
+      let curPixels = 0;
+      let valleyCount = 0;
 
-    if (skinPixelCount >= 20 && maxX > minX && maxY > minY) {
+      for (let x = 0; x < sampleW; x++) {
+        const isSkinCol = histX[x] >= 3;
+
+        if (isSkinCol) {
+          if (!inCluster) {
+            inCluster = true;
+            curMinX = x;
+            curMaxX = x;
+            curMinY = minColY[x];
+            curMaxY = maxColY[x];
+            curPixels = histX[x];
+            valleyCount = 0;
+          } else {
+            curMaxX = x;
+            if (minColY[x] < curMinY) curMinY = minColY[x];
+            if (maxColY[x] > curMaxY) curMaxY = maxColY[x];
+            curPixels += histX[x];
+            valleyCount = 0;
+          }
+        } else {
+          if (inCluster) {
+            valleyCount++;
+            if (valleyCount >= 5 || x === sampleW - 1) {
+              if (curPixels >= 20 && (curMaxX - curMinX) >= 5 && (curMaxY - curMinY) >= 5) {
+                clusters.push({
+                  minX: curMinX,
+                  maxX: curMaxX,
+                  minY: curMinY,
+                  maxY: curMaxY,
+                  pixelCount: curPixels,
+                });
+              }
+              inCluster = false;
+              valleyCount = 0;
+            }
+          }
+        }
+      }
+
+      if (inCluster && curPixels >= 20 && (curMaxX - curMinX) >= 5 && (curMaxY - curMinY) >= 5) {
+        clusters.push({
+          minX: curMinX,
+          maxX: curMaxX,
+          minY: curMinY,
+          maxY: curMaxY,
+          pixelCount: curPixels,
+        });
+      }
+
       const scaleX = origW / sampleW;
       const scaleY = origH / sampleH;
-      const rawBoxW = (maxX - minX) * scaleX;
-      const rawBoxH = (maxY - minY) * scaleY;
 
-      // Anthropometric face geometry: Head height is at most 1.35x head width
-      const faceH = Math.min(rawBoxH, rawBoxW * 1.35);
-      const faceW = Math.min(rawBoxW, faceH * 1.15);
+      const clusterToBox = (c: { minX: number; maxX: number; minY: number; maxY: number }) => {
+        const faceW = (c.maxX - c.minX) * scaleX;
+        const faceH = (c.maxY - c.minY) * scaleY;
+        const cx = ((c.minX + c.maxX) / 2) * scaleX;
+        const cy = ((c.minY + c.maxY) / 2) * scaleY;
 
-      const marginX = faceW * 0.12;
-      const marginY = faceH * 0.12;
+        const boxSize = Math.max(faceH * 1.5, faceW * 2.3);
+        const boxW = Math.min(origW, boxSize * 1.15);
+        const boxH = Math.min(origH, boxSize * 1.25);
 
-      const left = Math.max(0, Math.round(minX * scaleX - marginX));
-      const top = Math.max(0, Math.round(minY * scaleY - marginY));
-      const width = Math.min(origW - left, Math.round(faceW + marginX * 2));
-      const height = Math.min(origH - top, Math.round(faceH + marginY * 2));
+        const left = Math.max(0, Math.round(cx - boxW / 2));
+        const top = Math.max(0, Math.round(cy - boxH / 2));
+        const width = Math.min(origW - left, Math.round(boxW));
+        const height = Math.min(origH - top, Math.round(boxH));
 
-      if (width >= 30 && height >= 30) {
-        return {
-          faceCount,
-          box: { left, top, width, height },
-        };
+        return { left, top, width, height };
+      };
+
+      const boxes: { left: number; top: number; width: number; height: number }[] = [];
+
+      for (const cl of clusters) {
+        const b = clusterToBox(cl);
+        if (b.width >= 20 && b.height >= 20) {
+          boxes.push(b);
+        }
       }
+
+      // Also include the primary bounding box spanning all detected skin pixels
+      const primaryBox = clusterToBox({
+        minX: minOverallX,
+        maxX: maxOverallX,
+        minY: minOverallY,
+        maxY: maxOverallY,
+      });
+
+      if (boxes.length === 0) {
+        boxes.push(primaryBox);
+      } else if (clusters.length > 1) {
+        // In multi-face cases, also include primary encompassing box for overall coverage
+        boxes.push(primaryBox);
+      }
+
+      const faceCount = Math.max(1, clusters.length);
+
+      return {
+        faceCount,
+        box: boxes[0],
+        boxes,
+      };
     }
   } catch (err) {
-    console.warn('[FaceCrop] Skin clustering warning:', err);
+    console.warn('[FaceCrop] Face detection warning:', err);
   }
 
-  // Consistent central portrait bounding box fallback (focuses on subject's head, avoids wide background distortion)
+  // Consistent central portrait bounding box fallback
   const fallbackW = Math.max(20, Math.round(origW * 0.60));
   const fallbackH = Math.max(20, Math.round(origH * 0.75));
   const fallbackLeft = Math.max(0, Math.round((origW - fallbackW) / 2));
   const fallbackTop = Math.max(0, Math.round((origH - fallbackH) * 0.35));
+  const fallbackBox = { left: fallbackLeft, top: fallbackTop, width: fallbackW, height: fallbackH };
 
   return {
     faceCount: 1,
-    box: { left: fallbackLeft, top: fallbackTop, width: fallbackW, height: fallbackH },
+    box: fallbackBox,
+    boxes: [fallbackBox],
+  };
+
+  return {
+    faceCount: 1,
+    box: fallbackBox,
+    boxes: [fallbackBox],
   };
 }
 
@@ -293,7 +392,8 @@ export async function checkPassiveFaceLiveness(imgBuffer: Buffer): Promise<FaceL
  */
 export async function extractFaceBiometricVector(
   base64Image: string,
-  flipHorizontal: boolean = false
+  flipHorizontal: boolean = false,
+  explicitBox?: { left: number; top: number; width: number; height: number }
 ): Promise<number[]> {
   try {
     let cleanB64 = base64Image;
@@ -307,13 +407,18 @@ export async function extractFaceBiometricVector(
     const origW = meta.width || 640;
     const origH = meta.height || 480;
 
-    const detection = await detectFacesAndCount(imgBuffer);
+    let targetBox = explicitBox;
+    if (!targetBox) {
+      const detection = await detectFacesAndCount(imgBuffer);
+      targetBox = detection.box;
+    }
+
     let pipeline = sharp(imgBuffer);
-    if (detection.box.width > 20 && detection.box.height > 20) {
-      const left = Math.max(0, Math.min(origW - 10, detection.box.left));
-      const top = Math.max(0, Math.min(origH - 10, detection.box.top));
-      const width = Math.max(10, Math.min(origW - left, detection.box.width));
-      const height = Math.max(10, Math.min(origH - top, detection.box.height));
+    if (targetBox && targetBox.width > 20 && targetBox.height > 20) {
+      const left = Math.max(0, Math.min(origW - 10, targetBox.left));
+      const top = Math.max(0, Math.min(origH - 10, targetBox.top));
+      const width = Math.max(10, Math.min(origW - left, targetBox.width));
+      const height = Math.max(10, Math.min(origH - top, targetBox.height));
       pipeline = pipeline.extract({ left, top, width, height });
     }
     if (flipHorizontal) {
