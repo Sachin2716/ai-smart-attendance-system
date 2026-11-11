@@ -34,7 +34,10 @@ class CandidateStudent(BaseModel):
 class MatchCandidatesRequest(BaseModel):
     live_image_base64: str
     candidates: List[CandidateStudent]
-    threshold: Optional[float] = 0.75
+    target_student_id: Optional[str] = None
+    mode: Optional[str] = None
+    threshold: Optional[float] = 0.60
+    ambiguity_margin: Optional[float] = 0.10
 
 class FaceVerificationRequest(BaseModel):
     image_base64: str
@@ -254,36 +257,89 @@ def match_against_candidates(req: MatchCandidatesRequest):
             "message": "No enrolled face templates registered for this class section."
         }
         
-    threshold = req.threshold or settings.SIMILARITY_THRESHOLD
-    best_candidate = None
-    best_similarity = -1.0
-    
+    threshold = req.threshold or 0.60
+    ambiguity_margin = req.ambiguity_margin or 0.10
+
+    # Score and rank all candidate students
+    scored = []
     for candidate in req.candidates:
         sim = calculate_cosine_similarity(live_embedding, candidate.embedding)
-        if sim > best_similarity:
-            best_similarity = sim
-            best_candidate = candidate
-            
-    print(f"[MatchCandidates] Tested {len(req.candidates)} candidate(s). Best: {best_candidate.name if best_candidate else 'None'} ({best_similarity:.4f} vs threshold {threshold:.4f}) -> {'MATCHED' if best_similarity >= threshold else 'REJECTED'}")
-    
-    if best_similarity >= threshold and best_candidate:
+        scored.append((candidate, sim))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+    best_candidate, best_similarity = scored[0]
+    second_candidate, second_similarity = scored[1] if len(scored) > 1 else (None, -1.0)
+
+    # 1:1 Verification Mode
+    is_1to1 = req.mode == "1:1" or (bool(req.target_student_id) and req.mode != "1:N")
+
+    if is_1to1 and req.target_student_id:
+        target_cand = next((c for c in req.candidates if c.id == req.target_student_id or c.roll_number == req.target_student_id), None)
+        if not target_cand:
+            return {
+                "success": False,
+                "status": "TARGET_NOT_FOUND",
+                "message": f"Target student ({req.target_student_id}) not found among enrolled candidates."
+            }
+        
+        target_sim = calculate_cosine_similarity(live_embedding, target_cand.embedding)
+
+        if target_sim < threshold:
+            return {
+                "success": False,
+                "status": "FACE_NOT_RECOGNIZED",
+                "similarity_score": max(0.0, target_sim),
+                "message": f"Face does not match registered student profile ({target_cand.name}). Match confidence: {round(max(0.0, target_sim) * 100, 1)}% (required: {round(threshold * 100, 1)}%). Attendance rejected."
+            }
+
+        # Cross-Student Impostor Check: If another student has a higher similarity, reject!
+        if best_candidate and best_candidate.id != target_cand.id and best_similarity > target_sim:
+            return {
+                "success": False,
+                "status": "IDENTITY_MISMATCH",
+                "similarity_score": target_sim,
+                "message": f"Identity mismatch! The person in front of the camera matches {best_candidate.name} ({best_candidate.roll_number}), NOT {target_cand.name}. Attendance rejected."
+            }
+
         return {
             "success": True,
             "status": "MATCHED",
-            "student_id": best_candidate.id,
-            "roll_number": best_candidate.roll_number,
-            "name": best_candidate.name,
-            "similarity_score": best_similarity,
+            "student_id": target_cand.id,
+            "roll_number": target_cand.roll_number,
+            "name": target_cand.name,
+            "similarity_score": target_sim,
             "liveness_score": liveness["liveness_score"],
-            "message": f"Verified: {best_candidate.name} ({round(best_similarity * 100, 1)}% match)"
+            "message": f"Identity Verified: {target_cand.name} ({round(target_sim * 100, 1)}% match)"
         }
-    else:
+
+    # 1:N Identification Mode
+    if best_similarity < threshold or not best_candidate:
         return {
             "success": False,
             "status": "UNKNOWN_FACE",
             "similarity_score": max(0.0, best_similarity),
-            "message": f"Face not recognized with sufficient confidence (Highest match: {round(max(0.0, best_similarity) * 100, 1)}%, required: {round(threshold * 100, 1)}%)."
+            "message": f"Unknown person / Face not recognized. No enrolled student matches this face (Highest match: {round(max(0.0, best_similarity) * 100, 1)}%, required: {round(threshold * 100, 1)}%). Attendance rejected."
         }
+
+    # Ambiguity check
+    if second_candidate and second_similarity >= threshold and (best_similarity - second_similarity) < ambiguity_margin:
+        return {
+            "success": False,
+            "status": "AMBIGUOUS_MATCH",
+            "similarity_score": best_similarity,
+            "message": f"Ambiguous biometric match between {best_candidate.name} and {second_candidate.name}. Please face camera directly."
+        }
+
+    return {
+        "success": True,
+        "status": "MATCHED",
+        "student_id": best_candidate.id,
+        "roll_number": best_candidate.roll_number,
+        "name": best_candidate.name,
+        "similarity_score": best_similarity,
+        "liveness_score": liveness["liveness_score"],
+        "message": f"Identity Verified: {best_candidate.name} ({round(best_similarity * 100, 1)}% match)"
+    }
 
 @router.post("/verify")
 def verify_live_face(

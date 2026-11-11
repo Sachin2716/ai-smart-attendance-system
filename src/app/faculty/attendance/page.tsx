@@ -63,7 +63,25 @@ export default function FacultyAttendancePage() {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
-  const [aiStatus, setAiStatus] = useState<'IDLE' | 'MATCHED' | 'FAILED' | 'OFFLINE'>('IDLE');
+  const [aiStatus, setAiStatus] = useState<
+    | 'IDLE'
+    | 'FACE_DETECTED'
+    | 'VERIFYING_IDENTITY'
+    | 'IDENTITY_VERIFIED'
+    | 'ATTENDANCE_MARKED'
+    | 'FACE_NOT_RECOGNIZED'
+    | 'MULTIPLE_FACES_DETECTED'
+    | 'LIVENESS_CHECK_FAILED'
+    | 'IDENTITY_MISMATCH'
+    | 'FAILED'
+    | 'OFFLINE'
+  >('IDLE');
+  const [recognitionMode, setRecognitionMode] = useState<'1:N' | '1:1'>('1:N');
+  const [verifiedStudentInfo, setVerifiedStudentInfo] = useState<{
+    name: string;
+    rollNumber: string;
+    confidence: number;
+  } | null>(null);
 
   // RFID / NFC State
   const [isNfcScanning, setIsNfcScanning] = useState(false);
@@ -277,8 +295,9 @@ export default function FacultyAttendancePage() {
     }
 
     setIsAiProcessing(true);
-    setAiStatus('IDLE');
-    setAiMessage('Scanning face and verifying biometric match...');
+    setAiStatus('VERIFYING_IDENTITY');
+    setAiMessage('Face detected! Verifying identity against enrolled students...');
+    setVerifiedStudentInfo(null);
 
     try {
       const video = videoRef.current;
@@ -296,34 +315,67 @@ export default function FacultyAttendancePage() {
           body: JSON.stringify({
             sessionId: activeSession.id,
             imageBase64,
-            studentId: currentStudent?.studentId,
+            studentId: recognitionMode === '1:1' ? currentStudent?.studentId : undefined,
+            mode: recognitionMode,
           }),
         });
 
         const data = await res.json();
 
         if (res.ok && data.success && data.student) {
-          setAiStatus('MATCHED');
-          setAiMessage(`✓ Verified: ${data.student.name} (${data.student.rollNumber})`);
-          toast.success(`Face Verified: ${data.student.name}! Marked PRESENT.`);
+          setAiStatus('ATTENDANCE_MARKED');
+          setVerifiedStudentInfo({
+            name: data.student.name,
+            rollNumber: data.student.rollNumber,
+            confidence: data.confidence || 0.85,
+          });
+          setAiMessage(`IDENTITY VERIFIED: ${data.student.name} (${data.student.rollNumber}) — ATTENDANCE MARKED`);
+          toast.success(`Identity Verified: ${data.student.name}! Attendance Marked PRESENT.`);
           
           await fetchSessionDetails(activeSession.id);
 
-          // Auto-advance to next student in queue
-          if (autoAdvanceEnabled) {
+          // In 1:N mode, highlight the recognized student
+          if (recognitionMode === '1:N') {
+            const foundIdx = sortedRecords.findIndex(
+              (r) => r.studentId === data.student.id || r.student?.rollNumber === data.student.rollNumber
+            );
+            if (foundIdx !== -1) {
+              setCurrentStudentIndex(foundIdx);
+            }
+          } else if (autoAdvanceEnabled) {
             setTimeout(() => {
               advanceToNext();
             }, 800);
           }
-        } else if (!data.aiAvailable) {
-          setAiStatus('FAILED');
-          setAiMessage(data.error || 'Face verification failed.');
-          toast.error(data.error || 'Face not verified. You can retry or use manual marking.');
         } else {
-          setAiStatus('FAILED');
+          const code = data.statusCode || 'FAILED';
           const errorMsg = data.error || 'Face not recognized with sufficient confidence.';
-          setAiMessage(`⚠️ Verification Failed: ${errorMsg}`);
-          toast.error(errorMsg);
+
+          if (code === 'IDENTITY_MISMATCH') {
+            setAiStatus('IDENTITY_MISMATCH');
+            setAiMessage(`IDENTITY MISMATCH: ${errorMsg}`);
+            toast.error(errorMsg);
+          } else if (code === 'FACE_NOT_RECOGNIZED' || code === 'UNKNOWN_FACE') {
+            setAiStatus('FACE_NOT_RECOGNIZED');
+            setAiMessage(`FACE NOT RECOGNIZED: ${errorMsg}`);
+            toast.error('Face Not Recognized: No enrolled student matches this face.');
+          } else if (code === 'MULTIPLE_FACES') {
+            setAiStatus('MULTIPLE_FACES_DETECTED');
+            setAiMessage(`MULTIPLE FACES DETECTED: ${errorMsg}`);
+            toast.error('Multiple faces detected: Exactly one student must stand before camera.');
+          } else if (code === 'LIVENESS_FAILED') {
+            setAiStatus('LIVENESS_CHECK_FAILED');
+            setAiMessage(`LIVENESS CHECK FAILED: ${errorMsg}`);
+            toast.error('Liveness Check Failed: Spoof attempt rejected.');
+          } else if (code === 'ALREADY_MARKED') {
+            setAiStatus('IDENTITY_VERIFIED');
+            setAiMessage(`ALREADY MARKED: ${errorMsg}`);
+            toast.info(errorMsg);
+          } else {
+            setAiStatus('FAILED');
+            setAiMessage(`VERIFICATION FAILED: ${errorMsg}`);
+            toast.error(errorMsg);
+          }
         }
       }
     } catch (e) {
@@ -934,10 +986,12 @@ export default function FacultyAttendancePage() {
                   {/* AI Facial Recognition Camera Viewport */}
                   <div
                     className={`p-5 rounded-2xl bg-[#18181B] border transition-all duration-300 space-y-4 shadow-xl shadow-black/40 ${
-                      aiStatus === 'MATCHED'
+                      aiStatus === 'ATTENDANCE_MARKED' || aiStatus === 'IDENTITY_VERIFIED'
                         ? 'border-emerald-500 shadow-[0_0_24px_rgba(34,197,94,0.25)]'
-                        : aiStatus === 'FAILED'
+                        : aiStatus === 'IDENTITY_MISMATCH' || aiStatus === 'FAILED'
                         ? 'border-rose-500 shadow-[0_0_24px_rgba(239,68,68,0.25)]'
+                        : aiStatus === 'FACE_NOT_RECOGNIZED' || aiStatus === 'MULTIPLE_FACES_DETECTED'
+                        ? 'border-amber-500 shadow-[0_0_24px_rgba(245,158,11,0.25)]'
                         : 'border-[#27272A]'
                     }`}
                   >
@@ -1014,9 +1068,19 @@ export default function FacultyAttendancePage() {
                       )}
 
                       {/* Target Student Tag on Camera */}
-                      {isCameraActive && currentStudent && (
-                        <div className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-black/80 border border-[#27272A] text-[10px] font-mono text-cyan-300 backdrop-blur-sm pointer-events-none">
-                          Expecting: {currentStudent.student.rollNumber}
+                      {isCameraActive && (
+                        <div className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-black/85 border border-[#27272A] text-[10px] font-mono backdrop-blur-sm pointer-events-none flex items-center gap-1.5">
+                          {recognitionMode === '1:1' && currentStudent ? (
+                            <>
+                              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                              <span className="text-amber-300">1:1 Target: {currentStudent.student.rollNumber} ({currentStudent.student.name})</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                              <span className="text-cyan-300">1:N Scanner: Auto-Identifying Enrolled Students</span>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1024,27 +1088,75 @@ export default function FacultyAttendancePage() {
                     {/* Status Indicator Banner */}
                     {aiMessage && (
                       <div
-                        className={`p-3 rounded-xl text-xs border flex items-center gap-2.5 transition-all ${
-                          aiStatus === 'MATCHED'
-                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                            : aiStatus === 'OFFLINE'
-                            ? 'bg-amber-950/40 border-amber-500/40 text-amber-300'
-                            : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                        className={`p-3.5 rounded-xl text-xs border flex items-start gap-2.5 transition-all shadow-md ${
+                          aiStatus === 'ATTENDANCE_MARKED' || aiStatus === 'IDENTITY_VERIFIED'
+                            ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-300'
+                            : aiStatus === 'IDENTITY_MISMATCH'
+                            ? 'bg-rose-950/60 border-rose-500/60 text-rose-200'
+                            : aiStatus === 'MULTIPLE_FACES_DETECTED' || aiStatus === 'LIVENESS_CHECK_FAILED'
+                            ? 'bg-orange-950/50 border-orange-500/50 text-orange-200'
+                            : aiStatus === 'FACE_NOT_RECOGNIZED'
+                            ? 'bg-amber-950/50 border-amber-500/50 text-amber-200'
+                            : aiStatus === 'VERIFYING_IDENTITY'
+                            ? 'bg-cyan-950/50 border-cyan-500/50 text-cyan-200'
+                            : 'bg-zinc-900 border-zinc-700 text-zinc-300'
                         }`}
                       >
-                        {aiStatus === 'MATCHED' ? (
-                          <CheckCircle2 className="w-4 h-4 shrink-0 text-[#22C55E]" />
-                        ) : aiStatus === 'OFFLINE' ? (
-                          <AlertTriangle className="w-4 h-4 shrink-0 text-[#F59E0B]" />
+                        {aiStatus === 'ATTENDANCE_MARKED' || aiStatus === 'IDENTITY_VERIFIED' ? (
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-[#22C55E] mt-0.5" />
+                        ) : aiStatus === 'IDENTITY_MISMATCH' ? (
+                          <Shield className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                        ) : aiStatus === 'MULTIPLE_FACES_DETECTED' ? (
+                          <Users className="w-4 h-4 shrink-0 text-orange-400 mt-0.5" />
+                        ) : aiStatus === 'LIVENESS_CHECK_FAILED' ? (
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                        ) : aiStatus === 'FACE_NOT_RECOGNIZED' ? (
+                          <UserX className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                        ) : aiStatus === 'VERIFYING_IDENTITY' ? (
+                          <Cpu className="w-4 h-4 shrink-0 text-cyan-400 animate-spin mt-0.5" />
                         ) : (
-                          <XCircle className="w-4 h-4 shrink-0 text-[#EF4444]" />
+                          <XCircle className="w-4 h-4 shrink-0 text-[#EF4444] mt-0.5" />
                         )}
-                        <span className="truncate">{aiMessage}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold">{aiMessage}</div>
+                          {verifiedStudentInfo && (
+                            <div className="mt-1 text-[11px] text-emerald-400/90 font-mono">
+                              Match Confidence: {(verifiedStudentInfo.confidence * 100).toFixed(1)}% | Verified via Zero-Centered 128D Biometric Model
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 
-                    {/* Scan Action Controls */}
+                    {/* Mode Selector & Action Controls */}
                     <div className="space-y-2 pt-1">
+                      <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#111318] border border-[#27272A] text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => setRecognitionMode('1:N')}
+                          className={`py-1.5 rounded-lg font-mono font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                            recognitionMode === '1:N'
+                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              : 'text-zinc-400 hover:text-white'
+                          }`}
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                          <span>1:N Universal Scan</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRecognitionMode('1:1')}
+                          className={`py-1.5 rounded-lg font-mono font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                            recognitionMode === '1:1'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                              : 'text-zinc-400 hover:text-white'
+                          }`}
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>1:1 Targeted Match</span>
+                        </button>
+                      </div>
+
                       <button
                         onClick={triggerAiFaceScan}
                         disabled={!isCameraActive || isAiProcessing}
@@ -1055,7 +1167,11 @@ export default function FacultyAttendancePage() {
                         ) : (
                           <>
                             <Fingerprint className="w-4 h-4 text-white" />
-                            <span>Scan Face (Spacebar) & Auto-Advance</span>
+                            <span>
+                              {recognitionMode === '1:1'
+                                ? `Verify ${currentStudent?.student?.name || 'Selected Student'} (1:1)`
+                                : 'Scan Face & Identify Student (1:N)'}
+                            </span>
                           </>
                         )}
                       </button>
