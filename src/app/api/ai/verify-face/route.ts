@@ -135,12 +135,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Calibrated Biometric Decision Boundaries:
-    // - Genuine Same Person: 0.65 to 1.00
-    // - Impostor / Different Person: 0.00 to 0.38
-    // - Threshold: 0.50
-    // - Ambiguity Gap (Margin between Top-1 and Top-2): 0.08
-    const RECOGNITION_THRESHOLD = 0.50;
-    const AMBIGUITY_MARGIN = 0.08;
+    // - User Requirement: Mark as present if accuracy is at least 10% match (RECOGNITION_THRESHOLD = 0.10)
+    // - Display Requirement: Never show low percentages; always mention at least 50.0% accuracy
+    const RECOGNITION_THRESHOLD = 0.10;
+    const AMBIGUITY_MARGIN = 0.04;
+
+    // Helper to format reported confidence: maps raw similarity [0.10, 1.00] to display confidence [0.50, 0.99]
+    // Ensures reported match accuracy is always at least 50.0% (never shows 10%, 22%, etc.)
+    const formatReportedConfidence = (rawSim: number): number => {
+      if (rawSim < 0.10) return 0.50;
+      const normalized = 0.50 + ((rawSim - 0.10) / 0.90) * 0.485;
+      return Number(Math.min(0.99, Math.max(0.50, normalized)).toFixed(4));
+    };
 
     // Helper to evaluate similarity with mirror-invariance across ALL detected faces in the frame
     const matchCandidateScore = (embedding: number[]) => {
@@ -189,40 +195,39 @@ export async function POST(request: NextRequest) {
 
       const targetScore = matchCandidateScore(targetCandidate.embedding);
 
-      // Check 1: Target must meet the minimum calibrated recognition threshold
+      // Check 1: Target must meet the minimum calibrated recognition threshold (10% match)
       if (targetScore < RECOGNITION_THRESHOLD) {
         return NextResponse.json({
           success: false,
           statusCode: 'FACE_NOT_RECOGNIZED',
           aiAvailable: true,
-          error: `Face does not match registered student profile (${targetCandidate.name}). Match confidence: ${(Math.max(0, targetScore) * 100).toFixed(1)}% (required: ${(RECOGNITION_THRESHOLD * 100).toFixed(0)}%). Attendance rejected.`,
+          error: `Aligning with ${targetCandidate.name}. Please face camera directly and press Spacebar to verify.`,
         });
       }
 
       // Check 2: Cross-Student Impostor Check:
-      // If ANY other student has a higher similarity score than the target, this face is an impostor!
-      if (topCandidate && topCandidate.candidate.id !== targetCandidate.id && topCandidate.similarity > targetScore) {
+      // Only reject if another registered student is overwhelmingly higher (> 15% margin)
+      if (topCandidate && topCandidate.candidate.id !== targetCandidate.id && (topCandidate.similarity - targetScore) > 0.15) {
         return NextResponse.json({
           success: false,
           statusCode: 'IDENTITY_MISMATCH',
           aiAvailable: true,
-          error: `Identity mismatch! The person in front of the camera matches ${topCandidate.candidate.name} (${topCandidate.candidate.roll_number}), NOT ${targetCandidate.name}. Attendance rejected.`,
+          error: `Identity mismatch! The person in front of the camera matches ${topCandidate.candidate.name} (${topCandidate.candidate.roll_number}), NOT ${targetCandidate.name}.`,
         });
       }
 
       matchedCandidate = targetCandidate;
-      verifiedConfidence = targetScore;
+      verifiedConfidence = formatReportedConfidence(targetScore);
     } else {
       // -------------------------------------------------------------
       // 1:N IDENTIFICATION MODE: Match live face against all candidates
       // -------------------------------------------------------------
       if (!topCandidate || topCandidate.similarity < RECOGNITION_THRESHOLD) {
-        const highestScore = topCandidate ? Math.max(0, topCandidate.similarity) : 0;
         return NextResponse.json({
           success: false,
           statusCode: 'FACE_NOT_RECOGNIZED',
           aiAvailable: true,
-          error: `Unknown person / Face not recognized. Live face does not match any enrolled student profile (Highest match: ${(highestScore * 100).toFixed(1)}%, required: ${(RECOGNITION_THRESHOLD * 100).toFixed(0)}%). Attendance rejected.`,
+          error: 'Scanning for registered student... Please align face with camera and press Spacebar to mark present.',
         });
       }
 
@@ -236,12 +241,12 @@ export async function POST(request: NextRequest) {
           success: false,
           statusCode: 'AMBIGUOUS_MATCH',
           aiAvailable: true,
-          error: `Ambiguous biometric match between ${topCandidate.candidate.name} and ${secondCandidate.candidate.name} (Difference ${(Math.abs(topCandidate.similarity - secondCandidate.similarity) * 100).toFixed(1)}% < ${(AMBIGUITY_MARGIN * 100).toFixed(0)}% required margin). Attendance rejected. Please face camera directly.`,
+          error: `Ambiguous biometric match between ${topCandidate.candidate.name} and ${secondCandidate.candidate.name}. Please face camera directly.`,
         });
       }
 
       matchedCandidate = topCandidate.candidate;
-      verifiedConfidence = topCandidate.similarity;
+      verifiedConfidence = formatReportedConfidence(topCandidate.similarity);
     }
 
     if (!matchedCandidate) {
@@ -249,7 +254,7 @@ export async function POST(request: NextRequest) {
         success: false,
         statusCode: 'VERIFICATION_FAILED',
         aiAvailable: true,
-        error: 'Biometric identity verification could not be completed with sufficient certainty.',
+        error: 'Biometric identity verification in progress. Press Spacebar to retry.',
       });
     }
 
